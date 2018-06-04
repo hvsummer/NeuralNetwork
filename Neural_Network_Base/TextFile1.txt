@@ -1,0 +1,21 @@
+﻿to use automatic apply learning rate
+we have to train an DNN with those input:
+1- structure: input-hidden-output
+2- activation function
+3- Update Type (SGD/MiniBatch/Batchs)
+4- choose the lowest MSE/Learning Rate
+5- 
+
+
+
+Su dung Neural Net recurrent doc truyen tien hiep
+che tao routine cho nhan vat chinh, nhan vat phu
+su dung timeline theo thoi gian/chuong/su kien
+ghep noi noi dung lai
+
+
+network su dung 3 dimension chinh
+va hang loat cac attribute phu
+co the nhu trong luong (gravity) / mat do (density)
+su dung cac phuong trinh vat ly de bieu dien cac dai luong nay trong mo hinh AI
+ 
