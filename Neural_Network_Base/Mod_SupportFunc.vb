@@ -12,16 +12,19 @@ Public Module Support
         If source.Count = 0 Then ToStr = "Null" : Exit Function
         Return Join(source.ToArray, Delimiter)
     End Function
+
     <Extension()>
     Public Function ToStr(ByRef source As List(Of String), Optional Delimiter$ = ",") As String
         If source.Count = 0 Then ToStr = "Null" : Exit Function
         Return Join(source.ToArray, Delimiter)
     End Function
+
     <Extension()>
     Public Function ToStr(ByRef source As IEnumerable(Of Double), Optional Delimiter$ = ",") As String
         If source.Count = 0 Then ToStr = "Null" : Exit Function
         Return source.ToArray.JoinDbl(Delimiter)
     End Function
+
     <Extension()>
     Public Function JoinDbl(ByRef Source As IEnumerable(Of Double), Optional Delimiter$ = ",") As String
         Dim str As Text.StringBuilder = New Text.StringBuilder
@@ -32,6 +35,7 @@ Public Module Support
         Next
         Return str.ToString
     End Function
+
     <Extension()>
     Public Sub ImportFromArray(Of T)(ByRef source As List(Of T), Arr As Array)
         source.Clear()
@@ -39,6 +43,26 @@ Public Module Support
             source.Add(n)
         Next
     End Sub
+
+    <Extension()>
+    Public Function toArray(ByRef Source As DataTable)
+        Return Source.AsEnumerable.Select(Function(d) DirectCast(d(0).ToString(), Object)).ToArray()
+    End Function
+    <Extension()>
+    Public Function toDict(ByRef Source As DataTable, FieldKey$)
+        Dim temp As New Dictionary(Of String, List(Of String))
+
+        For ii = 0 To Source.Rows.Count - 1
+            Dim l As New List(Of String)
+            For jj = 0 To Source.Columns.Count - 1
+                If Source.Rows(ii).Item(jj).ToString <> FieldKey Then
+                    l.Add(Source.Rows(ii).Item(jj).ToString)
+                End If
+            Next
+            temp.Add(Source.Rows(ii).Item(FieldKey), l)
+        Next
+        Return temp
+    End Function
 
     '//Frequently method
     Function Getfile(Multi As Boolean, Optional Title$ = "Select File to Import... ") As String
@@ -227,8 +251,8 @@ Public Module Support
     Public Function DesktopPath() As String
         DesktopPath = Environ("USERPROFILE") & "\Desktop\"
     End Function
-    'Relative path of project
 
+    'Relative path of project
     Public Function CurProjectPath()
         '//2 other ways
         'Application.Info.DirectoryPath

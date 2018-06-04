@@ -11,7 +11,7 @@ Public Class GUI
         Dim NumberOfInput&
         Dim listInput As List(Of Double) = New List(Of Double)
 
-        NumberOfInput = Split(tbNet.Text, "=")(0)
+        NumberOfInput = Split(cbNetSetting.Text, "=")(0)
 
         If DNN.Active = False Then MsgBox("Neural Network was not trained, please train it first !!") : Exit Sub
         If UBound(Split(tbDebugInput.Text, "|")) - LBound(Split(tbDebugInput.Text, "|")) + 1 <> NumberOfInput Then _
@@ -51,8 +51,8 @@ Public Class GUI
 
         If DNN.Active = False Then MsgBox("Neural Network was not trained, please train it first !!") : Exit Sub
 
-        NumberOfInput = Split(tbNet.Text, "=")(0)
-        NumberOfOutput = CDbl(Split(Split(tbNet.Text, "=")(UBound(Split(tbNet.Text, "="))), ".")(0))
+        NumberOfInput = Split(cbNetSetting.Text, "=")(0)
+        NumberOfOutput = CDbl(Split(Split(cbNetSetting.Text, "=")(UBound(Split(cbNetSetting.Text, "="))), ".")(0))
 
         '//Loop throught each line to find those group, each group will be split by number of input
         '//(ex; 10 values, but 2 inputs then we'll have 5 input groups)
@@ -110,7 +110,7 @@ Public Class GUI
         With Me
             .cbLearningRate.Text = DNN.LearningRate
             .cbMomentum.Text = (1 - DNN.Momentum)
-            .tbNet.Text = DNN.Network_Structure
+            .cbNetSetting.Text = DNN.Network_Structure
         End With
     End Sub
 
@@ -134,30 +134,66 @@ Public Class GUI
         End If
     End Sub
 
+    Private Sub cbGroupSel_Click(sender As Object, e As EventArgs) Handles cbGroupSel.Click
+
+    End Sub
+
     Private Sub bSaveStructure_Click(sender As Object, e As EventArgs) Handles bSaveStructure.Click
-        If DB.Query(String.Format("SELECT Count(*) FROM SettingList WHERE Value_Setting='{0}'", Me.tbNet.Text)).Rows.Count = 0 Then
-            DB.Execute(String.Format("INSERT INTO SettingList (Name_Setting, Value_Setting, dateCreated) VALUES ('{0}' , '{1}' , {2}) ",
-                                     Regex.Replace(tbNet.Text, "[a-Z]", ""), tbNet.Text, Today().ToString("YYYY-MM-DD")))
+        If DB.Query(String.Format("SELECT Count(*) FROM SettingList WHERE Value_Setting='{0}'", Me.cbNetSetting.Text))(0) = "0" Then
+            DB.Execute(String.Format("INSERT INTO SettingList (Name_Setting, Value_Setting, dateCreated) VALUES ('{0}' , '{1}' , '{2}') ",
+                                     Regex.Replace(cbNetSetting.Text, "[a-zA-Z\._]", ""), cbNetSetting.Text, Today().ToString("s")))
+            Update_cbNetSetting()
+            MsgBox("Saved")
+        Else
+            MsgBox("Already in the list")
         End If
     End Sub
+    Private Sub cbNetSetting_MeasureItem(ByVal sender As Object, ByVal e As MeasureItemEventArgs) Handles cbNetSetting.MeasureItem
+        e.ItemHeight = 30
+        e.ItemWidth = 324
+    End Sub
+    Private Sub cbNetSetting_DrawItem(ByVal sender As Object, ByVal e As DrawItemEventArgs) Handles cbNetSetting.DrawItem
+
+        If e.Index < 0 Then
+            Return
+        End If
+        e.Graphics.TextRenderingHint = Drawing.Text.TextRenderingHint.AntiAlias
+        Dim CB As ComboBox = TryCast(sender, ComboBox)
+        If (e.State And DrawItemState.Selected) = DrawItemState.Selected Then
+            e.Graphics.FillRectangle(New SolidBrush(Color.OrangeRed), e.Bounds)
+        Else
+            e.Graphics.FillRectangle(New SolidBrush(CB.BackColor), e.Bounds)
+        End If
+        e.Graphics.DrawString(CB.Items(e.Index).ToString(), e.Font, New SolidBrush(CB.ForeColor), New Point(e.Bounds.X, e.Bounds.Y))
+        e.DrawFocusRectangle()
+
+    End Sub
+
+    Private Sub Update_cbNetSetting()
+        With cbNetSetting
+            .Items.Clear()
+            .Items.AddRange(DB.Query("SELECT Value_Setting FROM SettingList").toArray())
+        End With
+    End Sub
+
     Public Sub createDefaultTable()
         'Table Store Value Set
         Dim strSQL$ = "CREATE TABLE IF NOT EXISTS TrainingSET (" &
-                      "SetID INTEGER  PRIMARY KEY, SetGroupName TEXT, dateCreated Numeric, SetInput TEXT, SetTarget TEXT, SetOutput TEXT, SetError TEXT )"
+                      "SetID INTEGER  PRIMARY KEY, SetGroupName TEXT, dateCreated TEXT, SetInput TEXT, SetTarget TEXT, SetOutput TEXT, SetError TEXT )"
         DB.Execute(strSQL)
 
         'Table Store all Setting
         strSQL = "CREATE TABLE IF NOT EXISTS SettingList (" &
-                 "ID_Setting INTEGER  PRIMARY KEY, Name_Setting TEXT, Value_Setting TEXT, dateCreated Numeric )"
+                 "ID_Setting INTEGER  PRIMARY KEY, Name_Setting TEXT, Value_Setting TEXT, dateCreated TEXT )"
         DB.Execute(strSQL)
-        If DB.Query(String.Format("SELECT Count(*) FROM SettingList WHERE Value_Setting='{0}'", "2=3.Leaky_RELU+4.Soft_Plus=2.Bent_Identity")).Rows.Count = 0 Then
-            DB.Execute(String.Format("INSERT INTO SettingList (Name_Setting, Value_Setting, dateCreated) VALUES ('{0}' , '{1}' , {2}) ",
-                                     Regex.Replace("2=3.Leaky_RELU+4.Soft_Plus=2.Bent_Identity", "[a-Z]", ""), "2=3.Leaky_RELU+4.Soft_Plus=2.Bent_Identity", Today().ToString("YYYY-MM-DD")))
+        If DB.Query(String.Format("SELECT Count(*) FROM SettingList WHERE Value_Setting='{0}'", "2=3.Leaky_RELU+4.Soft_Plus=2.Bent_Identity"))(0) = "0" Then
+            DB.Execute(String.Format("INSERT INTO SettingList (Name_Setting, Value_Setting, dateCreated) VALUES ('{0}' , '{1}' , '{2}') ",
+                                     Regex.Replace("2=3.Leaky_RELU+4.Soft_Plus=2.Bent_Identity", "[a-zA-Z\._]", ""), "2=3.Leaky_RELU+4.Soft_Plus=2.Bent_Identity", Today().ToString("s")))
         End If
 
         'Table store neural network
         strSQL = "CREATE TABLE IF NOT EXISTS Network (" &
-                 "ID_Network INTEGER  PRIMARY KEY, ID_Setting integer, Value_Network TEXT , dateCreated Numeric )"
+                 "ID_Network INTEGER  PRIMARY KEY, ID_Setting integer, Value_Network TEXT , dateCreated TEXT )"
         DB.Execute(strSQL)
     End Sub
 
@@ -172,8 +208,8 @@ Public Class GUI
         'Get List input
         If Data.Count = 0 Then MsgBox("No input, abort Train !!") : Exit Sub
 
-        NumberOfInput = Split(Me.tbNet.Text, "=")(0)
-        NumberOfOutput = CDbl(Split(Split(Me.tbNet.Text, "=")(UBound(Split(Me.tbNet.Text, "="))), ".")(0))
+        NumberOfInput = Split(Me.cbNetSetting.Text, "=")(0)
+        NumberOfOutput = CDbl(Split(Split(Me.cbNetSetting.Text, "=")(UBound(Split(Me.cbNetSetting.Text, "="))), ".")(0))
 
         '//Loop throught each line to find those group, each group will be split by number of input
         '//(ex; 10 values, but 2 inputs then we'll have 5 input groups)
@@ -190,7 +226,7 @@ Public Class GUI
             '//Setup network
             If Not .Active Then
                 .Name = "Adhoc Neural Network created at " & Format(Now(), "YYYYMMDD HH:MM:SS")
-                If .Build_NeuralNet(tbNet.Text) = False Then MsgBox("Failed to setup network, check again!!") : Exit Sub
+                If .Build_NeuralNet(cbNetSetting.Text) = False Then MsgBox("Failed to setup network, check again!!") : Exit Sub
             End If
 
             .LearningRate = cbLearningRate.Text
@@ -240,45 +276,43 @@ Public Class GUI
         End With
     End Sub
 
-
-
     Public Overrides Sub Refresh()
         Dim d&
         Dim Delta$ = "", AccDelta$ = ""
         With DNN
             TrClock(0) = TrClock(0) + GetTime()
-            'If TrClock(0) - TrClock(1) >= 1 Then
-            '//update value on screen
-            'Me.Repaint
-            tbDebugInput.Text = .st_Input
-            tbDebugOutput.Text = .Result
+            If TrClock(0) - TrClock(1) >= 1 Then
+                '//update value on screen
+                'Me.Repaint
+                tbDebugInput.Text = .st_Input
+                tbDebugOutput.Text = .Result
 
-            tbDelta.Text = ""
-            For d = 0 To .Layers(.Layers.Count - 1).Neurons.Count - 1
-                If Len(Delta) = 0 Then
-                    Delta = .Layers(.Layers.Count - 1).Neurons(d).Delta
-                Else
-                    Delta = Delta & "|" & .Layers(.Layers.Count - 1).Neurons(d).Delta
-                End If
-                If Len(AccDelta) = 0 Then
-                    AccDelta = .Layers(.Layers.Count - 1).Neurons(d).AccDelta
-                Else
-                    AccDelta = AccDelta & "|" & .Layers(.Layers.Count - 1).Neurons(d).AccDelta
-                End If
-            Next d
-            tbDelta.Text = Math.Round(CDbl(Delta), 15) & vbCrLf & Math.Round(CDbl(AccDelta), 15)
+                tbDelta.Text = ""
+                For d = 0 To .Layers(.Layers.Count - 1).Neurons.Count - 1
+                    If Len(Delta) = 0 Then
+                        Delta = .Layers(.Layers.Count - 1).Neurons(d).Delta
+                    Else
+                        Delta = Delta & "|" & .Layers(.Layers.Count - 1).Neurons(d).Delta
+                    End If
+                    If Len(AccDelta) = 0 Then
+                        AccDelta = .Layers(.Layers.Count - 1).Neurons(d).AccDelta
+                    Else
+                        AccDelta = AccDelta & "|" & .Layers(.Layers.Count - 1).Neurons(d).AccDelta
+                    End If
+                Next d
+                tbDelta.Text = Math.Round(CDbl(Delta), 15) & vbCrLf & Math.Round(CDbl(AccDelta), 15)
 
-            tbDebugOutput.Visible = False
-            tbDebugOutput.Visible = True
-            Me.tbGlobalError.Text = Math.Round(.globalError, 15).ToString("R")
-            tbStatus.Text = "Status: FF(" & .st_FF & " - " & Math.Round(.st_FF / TrClock(0), 2) _
-                                & ") Updated(" & .st_Updated_N & " - " & Math.Round(.st_Updated_N / TrClock(1), 2) _
-                                & ") Epoch(" & .st_CurrEpoch & "/" & cbEpoch.Text & " - " & Math.Round(.st_CurrEpoch / cbEpoch.Text * 100, 2) _
-                                & ") EpS(" & Math.Round(.st_CurrEpoch / TrClock(0), 2) _
-                                & ") - " & Math.Round(TrClock(0), 4) & " sec."
-            If MP.SelectedIndex = 1 Then Me.tbInfo_Click(Me, New EventArgs())
-            TrClock(1) = TrClock(0)
-            'End If
+                tbDebugOutput.Visible = False
+                tbDebugOutput.Visible = True
+                Me.tbGlobalError.Text = Math.Round(.globalError, 15).ToString("R")
+                tbStatus.Text = "Status: FF(" & .st_FF & " - " & Math.Round(.st_FF / TrClock(0), 2) _
+                                    & ") Updated(" & .st_Updated_N & " - " & Math.Round(.st_Updated_N / TrClock(1), 2) _
+                                    & ") Epoch(" & .st_CurrEpoch & "/" & cbEpoch.Text & " - " & Math.Round(.st_CurrEpoch / cbEpoch.Text * 100, 2) _
+                                    & ") EpS(" & Math.Round(.st_CurrEpoch / TrClock(0), 2) _
+                                    & ") - " & Math.Round(TrClock(0), 4) & " sec."
+                If MP.SelectedIndex = 1 Then Me.tbInfo_Click(Me, New EventArgs())
+                TrClock(1) = TrClock(0)
+            End If
             Application.DoEvents()
         End With
     End Sub
@@ -297,13 +331,13 @@ Public Class GUI
         Dim IO As Byte
         Dim listTmp As List(Of String) = New List(Of String)
 
-        NumberOfInput = Split(tbNet.Text, "=")(0)
-        NumberOfOutput = CDbl(Split(Split(tbNet.Text, "=")(UBound(Split(tbNet.Text, "="))), ".")(0))
+        NumberOfInput = Split(cbNetSetting.Text, "=")(0)
+        NumberOfOutput = CDbl(Split(Split(cbNetSetting.Text, "=")(UBound(Split(cbNetSetting.Text, "="))), ".")(0))
         ' IO: 1= I, 2 = O
         If Math.Max(NumberOfInput, NumberOfOutput) = NumberOfInput Then IO = 1 Else IO = 2
 
         With listTmp
-            .Add(tbNet.Text)
+            .Add(cbNetSetting.Text)
             .Add("Report Created: " & Format(Now(), "dd.mm.yyyy - hh:mm:ss"))
             .Add(String.Concat("Type", vbTab, "Group", vbTab, "Input", vbTab, "Target", vbTab, "Output", vbTab, "Error"))
             For ii = 0 To Data.Count - 1
@@ -333,7 +367,7 @@ Public Class GUI
         ' Add any initialization after the InitializeComponent() call.
         With Me
             .tbGlobalError.Text = "N/A"
-            .tbNet.Text = "2=3.Leaky_RELU+4.Soft_Plus=2.Bent_Identity"
+            .cbNetSetting.Text = "2=3.Leaky_RELU+4.Soft_Plus=2.Bent_Identity"
             .tbStatus.Text = "Status: Please add your input/target value into list using 'Add Data' button"
         End With
         DNN = New NeuralNet
@@ -341,12 +375,19 @@ Public Class GUI
         createDefaultTable()
         Console.WriteLine(DB.FullPath)
 
-        tbNet.Items.AddRange(DB.Query("SELECT Value_Setting FROM Settinglist").AsEnumerable.Select(Function(d) DirectCast(d(0).ToString(), Object)).ToArray())
+        cbNetSetting.Items.AddRange(DB.Query("SELECT Value_Setting FROM Settinglist").toArray())
+        If DB.Query("SELECT dateCreated & '-' & setGroupName & '-' & SUBSTR(SetInput,1,10) & '-' & SUBSTR(SetTarget,1,10) & '-' & SUBSTR(SetOutput,1,10) & '-' & SUBSTR(setError,1,10) as Col1, setGroupName as Col2 FROM TrainingSET", 1).rows.count > 0 Then
+            cbGroupSel.DataSource = DB.Query("SELECT dateCreated & '-' & setGroupName & '-' & SUBSTR(SetInput,1,10) & '-' & SUBSTR(SetTarget,1,10) & '-' & SUBSTR(SetOutput,1,10) & '-' & SUBSTR(setError,1,10) as Col1, setGroupName as Col2 FROM TrainingSET", 1)
+            cbGroupSel.DisplayMember = "Col1"
+            cbGroupSel.ValueMember = "Col2"
+            Data = DB.Query("SELECT setGroupName, SetInput, SetTarget, SetOutput, setError FROM TrainingSET").todict("setGroupName")
+        End If
 
     End Sub
 
     Private Sub GUI_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         CheckForIllegalCrossThreadCalls = False
     End Sub
+
 
 End Class

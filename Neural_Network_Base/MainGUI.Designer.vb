@@ -36,6 +36,8 @@ Partial Class GUI
         Me.CheckRnd = New System.Windows.Forms.CheckBox()
         Me.MP = New System.Windows.Forms.TabControl()
         Me.Tab1 = New System.Windows.Forms.TabPage()
+        Me.bSaveStructure = New System.Windows.Forms.Button()
+        Me.cbNetSetting = New System.Windows.Forms.ComboBox()
         Me.Label15 = New System.Windows.Forms.Label()
         Me.Label14 = New System.Windows.Forms.Label()
         Me.Label13 = New System.Windows.Forms.Label()
@@ -65,8 +67,6 @@ Partial Class GUI
         Me.tbDebugInput = New System.Windows.Forms.TextBox()
         Me.Tab2 = New System.Windows.Forms.TabPage()
         Me.tbInfo = New System.Windows.Forms.TextBox()
-        Me.tbNet = New System.Windows.Forms.ComboBox()
-        Me.bSaveStructure = New System.Windows.Forms.Button()
         Me.MP.SuspendLayout()
         Me.Tab1.SuspendLayout()
         Me.Tab2.SuspendLayout()
@@ -227,7 +227,7 @@ Partial Class GUI
         '
         Me.Tab1.BackColor = System.Drawing.Color.LightCyan
         Me.Tab1.Controls.Add(Me.bSaveStructure)
-        Me.Tab1.Controls.Add(Me.tbNet)
+        Me.Tab1.Controls.Add(Me.cbNetSetting)
         Me.Tab1.Controls.Add(Me.Label15)
         Me.Tab1.Controls.Add(Me.Label14)
         Me.Tab1.Controls.Add(Me.Label13)
@@ -273,6 +273,29 @@ Partial Class GUI
         Me.Tab1.Size = New System.Drawing.Size(775, 389)
         Me.Tab1.TabIndex = 0
         Me.Tab1.Text = "Setup"
+        '
+        'bSaveStructure
+        '
+        Me.bSaveStructure.FlatStyle = System.Windows.Forms.FlatStyle.Flat
+        Me.bSaveStructure.ForeColor = System.Drawing.Color.SeaGreen
+        Me.bSaveStructure.Location = New System.Drawing.Point(278, 82)
+        Me.bSaveStructure.Name = "bSaveStructure"
+        Me.bSaveStructure.Size = New System.Drawing.Size(73, 21)
+        Me.bSaveStructure.TabIndex = 53
+        Me.bSaveStructure.Text = "Save"
+        Me.bSaveStructure.UseVisualStyleBackColor = True
+        '
+        'cbNetSetting
+        '
+        Me.cbNetSetting.BackColor = System.Drawing.SystemColors.Window
+        Me.cbNetSetting.DrawMode = System.Windows.Forms.DrawMode.OwnerDrawVariable
+        Me.cbNetSetting.FormattingEnabled = True
+        Me.cbNetSetting.ItemHeight = 50
+        Me.cbNetSetting.Location = New System.Drawing.Point(278, 26)
+        Me.cbNetSetting.Name = "cbNetSetting"
+        Me.cbNetSetting.Size = New System.Drawing.Size(324, 56)
+        Me.cbNetSetting.TabIndex = 52
+        Me.cbNetSetting.Text = "2=3.Leaky_RELU+4.Soft_Plus=2.Bent_Identity"
         '
         'Label15
         '
@@ -375,12 +398,10 @@ Partial Class GUI
         Me.cbGroupSel.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
         Me.cbGroupSel.ForeColor = System.Drawing.Color.Blue
         Me.cbGroupSel.FormattingEnabled = True
-        Me.cbGroupSel.Items.AddRange(New Object() {"Train", "Validate", "Check", "Predict"})
         Me.cbGroupSel.Location = New System.Drawing.Point(11, 157)
         Me.cbGroupSel.Name = "cbGroupSel"
         Me.cbGroupSel.Size = New System.Drawing.Size(550, 21)
         Me.cbGroupSel.TabIndex = 42
-        Me.cbGroupSel.Text = "Train"
         '
         'tbStatus
         '
@@ -589,29 +610,6 @@ Partial Class GUI
         Me.tbInfo.Size = New System.Drawing.Size(763, 377)
         Me.tbInfo.TabIndex = 18
         '
-        'tbNet
-        '
-        Me.tbNet.DrawMode = System.Windows.Forms.DrawMode.OwnerDrawVariable
-        Me.tbNet.FormattingEnabled = True
-        Me.tbNet.ItemHeight = 50
-        Me.tbNet.Location = New System.Drawing.Point(278, 26)
-        Me.tbNet.Name = "tbNet"
-        Me.tbNet.Size = New System.Drawing.Size(324, 56)
-        Me.tbNet.Sorted = True
-        Me.tbNet.TabIndex = 52
-        Me.tbNet.Text = "2=3.Leaky_RELU+4.Soft_Plus=2.Bent_Identity"
-        '
-        'bSaveStructure
-        '
-        Me.bSaveStructure.FlatStyle = System.Windows.Forms.FlatStyle.Flat
-        Me.bSaveStructure.ForeColor = System.Drawing.Color.SeaGreen
-        Me.bSaveStructure.Location = New System.Drawing.Point(278, 82)
-        Me.bSaveStructure.Name = "bSaveStructure"
-        Me.bSaveStructure.Size = New System.Drawing.Size(73, 21)
-        Me.bSaveStructure.TabIndex = 53
-        Me.bSaveStructure.Text = "Save"
-        Me.bSaveStructure.UseVisualStyleBackColor = True
-        '
         'GUI
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
@@ -674,6 +672,6 @@ Partial Class GUI
     Friend WithEvents Label12 As Label
     Friend WithEvents Label11 As Label
     Friend WithEvents tbInfo As TextBox
-    Friend WithEvents tbNet As ComboBox
+    Friend WithEvents cbNetSetting As ComboBox
     Friend WithEvents bSaveStructure As Button
 End Class
