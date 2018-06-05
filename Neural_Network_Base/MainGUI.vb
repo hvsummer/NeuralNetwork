@@ -127,21 +127,30 @@ Public Class GUI
         Dim var As List(Of String)
         If Data.ContainsKey(cbGroupSel.Text) Then
             var = Data(cbGroupSel.Text)
-            tbInput.Text = var(0)
-            tbTarget.Text = var(1)
-            tbOutput.Text = var(2)
-            tbError.Text = var(3)
+            tbInput.Text = var(1)
+            tbTarget.Text = var(2)
+            tbOutput.Text = var(3)
+            tbError.Text = var(4)
         End If
     End Sub
 
-    Private Sub cbGroupSel_Click(sender As Object, e As EventArgs) Handles cbGroupSel.Click
+    Private Sub cbGroupSel_eClick(sender As Object, e As EventArgs) Handles cbGroupSel.Click
 
     End Sub
 
+    Private Sub bAddData_Click(sender As Object, e As EventArgs) Handles bAddData.Click
+        Me.Hide()
+        AddTrainingSet.DB = DB
+        AddTrainingSet.curSetting = cbNetSetting.Text
+        AddTrainingSet.Show()
+    End Sub
+
     Private Sub bSaveStructure_Click(sender As Object, e As EventArgs) Handles bSaveStructure.Click
-        If DB.Query(String.Format("SELECT Count(*) FROM SettingList WHERE Value_Setting='{0}'", Me.cbNetSetting.Text))(0) = "0" Then
+        If DB.Query(String.Format("SELECT Count(*) FROM SettingList WHERE Value_Setting='{0}'", Me.cbNetSetting.Text), 2)(0) = "0" Then
             DB.Execute(String.Format("INSERT INTO SettingList (Name_Setting, Value_Setting, dateCreated) VALUES ('{0}' , '{1}' , '{2}') ",
-                                     Regex.Replace(cbNetSetting.Text, "[a-zA-Z\._]", ""), cbNetSetting.Text, Today().ToString("s")))
+                                     Replace(Regex.Replace(Regex.Replace(cbNetSetting.Text, "[a-zA-Z\+\._]", ""), "(?<=\=).*?(?=\=)", ""), "==", "="),
+                                     cbNetSetting.Text, Today().ToString("s")))
+
             Update_cbNetSetting()
             MsgBox("Saved")
         Else
@@ -186,7 +195,7 @@ Public Class GUI
         strSQL = "CREATE TABLE IF NOT EXISTS SettingList (" &
                  "ID_Setting INTEGER  PRIMARY KEY, Name_Setting TEXT, Value_Setting TEXT, dateCreated TEXT )"
         DB.Execute(strSQL)
-        If DB.Query(String.Format("SELECT Count(*) FROM SettingList WHERE Value_Setting='{0}'", "2=3.Leaky_RELU+4.Soft_Plus=2.Bent_Identity"))(0) = "0" Then
+        If DB.Query(String.Format("SELECT Count(*) FROM SettingList WHERE Value_Setting='{0}'", "2=3.Leaky_RELU+4.Soft_Plus=2.Bent_Identity"), 2)(0) = "0" Then
             DB.Execute(String.Format("INSERT INTO SettingList (Name_Setting, Value_Setting, dateCreated) VALUES ('{0}' , '{1}' , '{2}') ",
                                      Regex.Replace("2=3.Leaky_RELU+4.Soft_Plus=2.Bent_Identity", "[a-zA-Z\._]", ""), "2=3.Leaky_RELU+4.Soft_Plus=2.Bent_Identity", Today().ToString("s")))
         End If
@@ -215,7 +224,6 @@ Public Class GUI
         '//(ex; 10 values, but 2 inputs then we'll have 5 input groups)
 
 
-        cbGroupSel.Text = "Train"
         cbGroupSel_Click()
         listInput = C2List(tbInput.Text).ConvertAll(Of Double)(New Converter(Of Object, Double)(Function(x) CDbl(x)))
         listTarget = C2List(tbTarget.Text).ConvertAll(Of Double)(New Converter(Of Object, Double)(Function(x) CDbl(x)))
@@ -318,13 +326,6 @@ Public Class GUI
     End Sub
 
 
-    Private Sub bAddData_Click(sender As Object, e As EventArgs) Handles bAddData.Click
-        Me.Hide()
-        AddTrainingSet.RefData = Data
-        AddTrainingSet.Show()
-        Console.WriteLine(Data.ToString())
-    End Sub
-
     Private Sub bView_Click(sender As Object, e As EventArgs) Handles bView.Click
         Dim ii&
         Dim NumberOfInput&, NumberOfOutput&
@@ -376,18 +377,30 @@ Public Class GUI
         Console.WriteLine(DB.FullPath)
 
         cbNetSetting.Items.AddRange(DB.Query("SELECT Value_Setting FROM Settinglist").toArray())
-        If DB.Query("SELECT dateCreated & '-' & setGroupName & '-' & SUBSTR(SetInput,1,10) & '-' & SUBSTR(SetTarget,1,10) & '-' & SUBSTR(SetOutput,1,10) & '-' & SUBSTR(setError,1,10) as Col1, setGroupName as Col2 FROM TrainingSET", 1).rows.count > 0 Then
-            cbGroupSel.DataSource = DB.Query("SELECT dateCreated & '-' & setGroupName & '-' & SUBSTR(SetInput,1,10) & '-' & SUBSTR(SetTarget,1,10) & '-' & SUBSTR(SetOutput,1,10) & '-' & SUBSTR(setError,1,10) as Col1, setGroupName as Col2 FROM TrainingSET", 1)
+        If DB.Query("SELECT * FROM TrainingSET").Rows.Count > 0 Then
+            cbGroupSel.DataSource = DB.Query("SELECT (date(dateCreated) || ' (' || setGroupName || ')..' || SUBSTR(SetInput,1,20) || '..' || SUBSTR(SetTarget,1,20) || '..' || SUBSTR(SetOutput,1,15) || '..' || SUBSTR(setError,1,15)) as Col1, setGroupName || SetID as Col2 FROM TrainingSET")
             cbGroupSel.DisplayMember = "Col1"
             cbGroupSel.ValueMember = "Col2"
-            Data = DB.Query("SELECT setGroupName, SetInput, SetTarget, SetOutput, setError FROM TrainingSET").todict("setGroupName")
+            Data = DB.Query("SELECT setGroupName || SetID as GName, SetInput, SetTarget, SetOutput, setError FROM TrainingSET").toDict("GName")
         End If
 
+    End Sub
+    Private Sub GUI_Enter(sender As Object, e As EventArgs) Handles MyBase.Enter
+        If DB.Query("SELECT * FROM TrainingSET").Rows.Count > 0 Then
+            cbGroupSel.DataSource = DB.Query("SELECT (date(dateCreated) || ' (' || setGroupName || ')..' || SUBSTR(SetInput,1,20) || '..' || SUBSTR(SetTarget,1,20) || '..' || SUBSTR(SetOutput,1,15) || '..' || SUBSTR(setError,1,15)) as Col1, setGroupName || SetID as Col2 FROM TrainingSET")
+            cbGroupSel.DisplayMember = "Col1"
+            cbGroupSel.ValueMember = "Col2"
+            Data = DB.Query("SELECT setGroupName || SetID as GName, SetInput, SetTarget, SetOutput, setError FROM TrainingSET").toDict("GName")
+        End If
     End Sub
 
     Private Sub GUI_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         CheckForIllegalCrossThreadCalls = False
     End Sub
 
-
+    Private Sub cbGroupSel_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cbGroupSel.SelectedIndexChanged
+        Dim cb = DirectCast(sender, ComboBox)
+        ' SelectedValue is an Object - you can get the name of its actual type with .SelectedValue.GetType().Name
+        cbGroupSel.Text = cb.SelectedValue.ToString
+    End Sub
 End Class

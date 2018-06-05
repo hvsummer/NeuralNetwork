@@ -42,31 +42,35 @@ Public Class LiteDb
             Return lastAffect
         End Using
     End Function
-    Public Function Query(strsql$, Optional method% = 2)
+    Public Overloads Function Query(strSQL$) As DataTable
         Try
-            If method = 1 Then
-                Using Tbl As New DataTable("Temp")
-                    Using adapter = New SQLiteDataAdapter(strsql, Conn)
-                        adapter.Fill(Tbl)
-                        Return Tbl
-                    End Using
+            Using Tbl As New DataTable("Temp")
+                Using adapter = New SQLiteDataAdapter(strSQL, Conn)
+                    adapter.Fill(Tbl)
+                    Return Tbl
                 End Using
-            Else
-                '//another way
-                Using Reader As SQLiteDataReader = (New SQLiteCommand(strsql, Conn)).ExecuteReader
-                    Dim Data As New List(Of String)
-                    While Reader.Read()
-                        Dim row As New List(Of String)
-                        With row
-                            For ii& = 0 To Reader.FieldCount - 1
-                                row.Add(Reader.GetValue(ii))
-                            Next
-                        End With
-                        Data.Add(row.ToStr(vbTab))
-                    End While
-                    Return Data
-                End Using
-            End If
+            End Using
+        Catch e As Exception
+            MsgBox(e.Message)
+            Return Nothing
+        End Try
+    End Function
+    Public Overloads Function Query(strsql$, Optional method% = 2) As List(Of String)
+        Try
+            '//another way
+            Using Reader As SQLiteDataReader = (New SQLiteCommand(strsql, Conn)).ExecuteReader
+                Dim Data As New List(Of String)
+                While Reader.Read()
+                    Dim row As New List(Of String)
+                    With row
+                        For ii& = 0 To Reader.FieldCount - 1
+                            row.Add(Reader.GetValue(ii))
+                        Next
+                    End With
+                    Data.Add(row.ToStr(vbTab))
+                End While
+                Return Data
+            End Using
         Catch e As Exception
             MsgBox(e.Message)
             Return Nothing
