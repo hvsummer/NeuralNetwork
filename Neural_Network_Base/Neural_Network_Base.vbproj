@@ -132,7 +132,7 @@
     <Compile Include="clsNeuron.vb" />
     <Compile Include="DbBrigde.vb" />
     <Compile Include="Mod_SupportFunc.vb" />
-    <Compile Include="ClsNeuralNetwork.vb" />
+    <Compile Include="clsNeuralNetwork.vb" />
     <Compile Include="MainGUI.vb">
       <SubType>Form</SubType>
     </Compile>

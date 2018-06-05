@@ -1,4 +1,5 @@
 ﻿Option Explicit On
+
 'Imports Neural_Network_Base
 
 Public Structure Status
@@ -9,11 +10,12 @@ Public Structure Status
     Public CurrentIndex&
 End Structure
 
+
 '// Define Neural Network ================================================================================================================================================
-'//
 Public Class NeuralNet
 
-    '//Variable used in network//
+#Region "//Variable used in network//"
+
     Public Layers As List(Of layer)
     Private NetName As String
     Public LearningRate#
@@ -22,16 +24,19 @@ Public Class NeuralNet
     Private errList As List(Of Double)
     Public Active As Boolean
 
+    'Status
     Public st_FF&
     Public st_Updated_N&
     Public st_Input$
     Public st_CurrEpoch&
     Public CurrentIndex&
 
+    '2 set of input data and target data using in each loop
     Public InData As List(Of List(Of Double))
     Public TargetData As List(Of List(Of Double))
+#End Region
 
-
+#Region "Properties"
     '//Default
     Public Property Status() As Status
         Get
@@ -126,11 +131,39 @@ Public Class NeuralNet
             Return Me.Layers(0).Neurons.Count & "=" & str
         End Get
     End Property
+    Public ReadOnly Property Result(Optional Deli$ = "|") As String
+        Get
+            Dim ii&
+            Dim R$ = ""
+            'Output
+            For ii = 0 To OutputNum - 1
+                If ii > 0 Then
+                    R = R & Deli & Math.Round(CDbl(Layers(Layers.Count - 1).Neurons(ii).Value), 8)
+                Else
+                    R = Math.Round(CDbl(Layers(Layers.Count - 1).Neurons(ii).Value), 8)
+                End If
+            Next
+            Return R
+        End Get
+    End Property
+
+#End Region
+
+    Public Sub Reset()
+        Layers.Clear()
+        Layers = New List(Of layer)
+        errList.Clear()
+        errList = New List(Of Double)
+        Active = False
+        globalError = 0
+    End Sub
 
     '//method
     Public Function ShallowCopy() As NeuralNet
         Return DirectCast(Me.MemberwiseClone(), NeuralNet)
     End Function
+
+#Region "Save and Load Network"
     Public Sub Save_NeuralNet(Name$, Path$)
         Dim ii&, jj&
         Dim Str As List(Of String) : Str = New List(Of String)
@@ -175,16 +208,10 @@ Public Class NeuralNet
             Next
         End With
     End Sub
+#End Region
 
-    Public Sub Reset()
-        Layers.Clear()
-        Layers = New List(Of layer)
-        errList.Clear()
-        errList = New List(Of Double)
-        Active = False
-        globalError = 0
-    End Sub
 
+#Region "Method Build Network"
     '// 2 method to build up network
     Public Function Build_NeuralNet(Genetic As String) As Boolean
         Dim strNetwork$, ii&, jj&
@@ -222,6 +249,120 @@ Public Class NeuralNet
         End With
         Layers.Add(L)
     End Sub
+
+#End Region
+
+
+    Public Delegate Sub DelegateTrain(Layers As List(Of layer), InData As List(Of List(Of Double)), TargetData As List(Of List(Of Double)), stt As Status, AF As ActivationFunc)
+    Public Delegate Function ActivationFunc(X As Decimal) As Decimal
+
+    Public Sub Train_Flexible(Epoch&, FuncTrainAlgothym As DelegateTrain, Optional AF As ActivationFunc = Nothing)
+
+        If InData Is Nothing And TargetData Is Nothing Then MsgBox("Please feed data into network with PrepareInOut Method before train",, "Warning") : Exit Sub
+
+        If AF Is Nothing Then
+            'AF = New ActivationFunc(AddressOf FunctionList.Activation.Sigmoid)
+            AF = AddressOf FunctionList.Activation.Sigmoid
+        End If
+
+        For i = 1 To Epoch
+            Me.st_CurrEpoch = i
+            FuncTrainAlgothym.Invoke(Layers, InData, TargetData, Me.Status, AF)
+        Next
+
+    End Sub
+
+    Public NotInheritable Class FunctionList
+
+        ''' <summary>
+        ''' list of Default function support for Activation and Loss
+        ''' </summary>
+
+        Public NotInheritable Class Activation
+
+            Public Shared Function Sigmoid(Value As Decimal) As Decimal
+                Return 1 / (1 + Math.Exp(-Value))
+            End Function
+
+            Public Shared Function LeakyRELU(Value As Decimal)
+                Return IIf(Value < 0, 0.01 * Value, Value)
+            End Function
+
+            Public Shared Function SoftPlus(Value As Decimal)
+                Return Math.Log(1 + Math.Exp(Value))
+            End Function
+
+            Public Shared Function BentIndentity(Value As Decimal)
+                Return ((Value ^ 2 + 1) ^ 0.5 - 1) / 2 + Value
+            End Function
+
+        End Class
+
+        Public NotInheritable Class Loss
+
+            Public Shared Function Sigmoid(Value As Decimal)
+                Return Activation.Sigmoid(Value) * (1 - Activation.Sigmoid(Value))
+            End Function
+
+            Public Shared Function LeakyRELU(Value As Decimal)
+                Return IIf(Value < 0, 0.01, 1)
+            End Function
+
+            Public Shared Function SoftPlus(Value As Decimal)
+                Return 1 / (1 + Math.Abs(Value)) ^ 2
+            End Function
+
+            Public Shared Function BentIndentity(Value As Decimal)
+                Return Value / (2 * (Value ^ 2 + 1) ^ 0.5) + 1
+            End Function
+
+        End Class
+
+    End Class
+
+    Private Function ActiveF(AFType As String, sum As Double) As Double
+        Select Case AFType
+            Case "Sigmoid"
+                ActiveF = 1 / (1 + Math.Exp(-sum))
+            Case "Leaky_RELU"
+                ActiveF = IIf(sum < 0, 0.01 * sum, sum)
+            Case "Soft_Plus"
+                ActiveF = Math.Log(1 + Math.Exp(sum))
+            Case "Bent_Identity"
+                ActiveF = ((sum ^ 2 + 1) ^ 0.5 - 1) / 2 + sum
+            Case Else
+                ActiveF = sum
+        End Select
+    End Function
+    Private Function ErrorS(AFType As String, sum As Double) As Double
+        Select Case AFType
+            Case "Sigmoid"
+                ErrorS = ActiveF(AFType, sum) * (1 - ActiveF(AFType, sum))
+            Case "Leaky_RELU"
+                ErrorS = IIf(sum < 0, 0.01, 1)
+            Case "Soft_Plus"
+                ErrorS = 1 / (1 + Math.Abs(sum)) ^ 2
+            Case "Bent_Identity"
+                ErrorS = sum / (2 * (sum ^ 2 + 1) ^ 0.5) + 1
+        End Select
+        Return ErrorS
+    End Function
+
+    Public Function MSE(Optional m& = -1)
+        'Calculate Error RSM
+        Dim ii&
+        Dim ErrorSignal As Double = 0
+        If m = -1 Then m = CurrentIndex
+        For ii = 0 To OutputNum - 1
+            With Layers(Layers.Count - 1).Neurons(ii)
+                ErrorSignal = ErrorSignal + (TargetData(m)(ii) - .Value) ^ 2
+            End With
+        Next ii
+
+        Return 0.5 * ErrorSignal / OutputNum
+    End Function
+
+#Region "Method to Set Input/Target Network"
     '//input with setinput, output with result
     Public Function SetInput(InArray As List(Of Double))
         Dim ii&
@@ -234,19 +375,20 @@ Public Class NeuralNet
         st_Input = InArray.ToStr("|")
         SetInput = True
     End Function
-    Public Function Result(Optional Deli$ = "|") As String
-        Dim ii&
-        Dim R$ = ""
-        'Output
-        For ii = 0 To OutputNum - 1
-            If ii > 0 Then
-                R = R & Deli & Math.Round(CDbl(Layers(Layers.Count - 1).Neurons(ii).Value), 8)
-            Else
-                R = Math.Round(CDbl(Layers(Layers.Count - 1).Neurons(ii).Value), 8)
-            End If
+
+    Public Sub PrepareInOut(setInputList As List(Of Double), setTargetList As List(Of Double))
+        Dim NoInput = Me.InputNum
+        Dim NoTarget = Me.OutputNum
+        For ii = 0 To setInputList.Count - 1 Step NoInput
+            If setInputList.Count Mod NoInput <> 0 Then If ii = setInputList.Count - 1 Then Exit For
+            InData.Add(setInputList.GetRange(ii, NoInput))
         Next
-        Result = R
-    End Function
+        For ii = 0 To setTargetList.Count - 1 Step NoTarget
+            If setTargetList.Count Mod NoTarget <> 0 Then If ii = setTargetList.Count - 1 Then Exit For
+            TargetData.Add(setTargetList.GetRange(ii, NoTarget))
+        Next
+    End Sub
+#End Region
 
     '//Execute input with calculate
     Public Function Calculate()
@@ -273,74 +415,8 @@ ErrHandle:
         Debug.Print(" Error while calculate network!! " & vbTab & Err.Description)
     End Function
 
-    Public Function MSE(Optional m& = -1)
-        'Calculate Error RSM
-        Dim ii&
-        Dim ErrorSignal As Double = 0
-        If m = -1 Then m = CurrentIndex
-        For ii = 0 To OutputNum - 1
-            With Layers(Layers.Count - 1).Neurons(ii)
-                ErrorSignal = ErrorSignal + (TargetData(m)(ii) - .Value) ^ 2
-            End With
-        Next ii
 
-        Return 0.5 * ErrorSignal / OutputNum
-    End Function
-    Public Sub PrepareInOut(setInputList As List(Of Double), setTargetList As List(Of Double))
-        Dim NoInput = Me.InputNum
-        Dim NoTarget = Me.OutputNum
-        For ii = 0 To setInputList.Count - 1 Step NoInput
-            If setInputList.Count Mod NoInput <> 0 Then If ii = setInputList.Count - 1 Then Exit For
-            InData.Add(setInputList.GetRange(ii, NoInput))
-        Next
-        For ii = 0 To setTargetList.Count - 1 Step NoTarget
-            If setTargetList.Count Mod NoTarget <> 0 Then If ii = setTargetList.Count - 1 Then Exit For
-            TargetData.Add(setTargetList.GetRange(ii, NoTarget))
-        Next
-    End Sub
-
-    Public Delegate Sub DelegateTrain(Layers As List(Of layer), InData As List(Of List(Of Double)), TargetData As List(Of List(Of Double)), stt As Status)
-    Public Delegate Function ActivationFunc(X As Decimal) As Decimal
-
-    Public Sub Train_Flexible(Epoch&, FuncTrainAlgothym As DelegateTrain)
-
-        If InData Is Nothing And TargetData Is Nothing Then MsgBox("Please feed data into network with PrepareInOut Method before train",, "Warning") : Exit Sub
-        For i = 1 To Epoch
-            Me.st_CurrEpoch = i
-            FuncTrainAlgothym.Invoke(Layers, InData, TargetData, Me.Status)
-        Next
-    End Sub
-
-    Private Function ErrorS(AFType As String, sum As Double, Output As Double) As Double
-        Select Case AFType
-            Case "Sigmoid"
-                ErrorS = Output * (1 - Output)
-            Case "Leaky_RELU"
-                ErrorS = IIf(sum < 0, 0.01, 1)
-            Case "Soft_Plus"
-                ErrorS = 1 / (1 + Math.Abs(sum)) ^ 2
-            Case "Bent_Identity"
-                ErrorS = sum / (2 * (sum ^ 2 + 1) ^ 0.5) + 1
-        End Select
-        Return ErrorS
-    End Function
-    Private Function ActiveF(AFType As String, sum As Double) As Double
-        Select Case AFType
-            Case "Sigmoid"
-                ActiveF = 1 / (1 + Math.Exp(-sum))
-            Case "Leaky_RELU"
-                ActiveF = IIf(sum < 0, 0.01 * sum, sum)
-            Case "Soft_Plus"
-                ActiveF = Math.Log(1 + Math.Exp(sum))
-            Case "Bent_Identity"
-                ActiveF = ((sum ^ 2 + 1) ^ 0.5 - 1) / 2 + sum
-            Case Else
-                ActiveF = sum
-        End Select
-    End Function
-
-
-    'Train static method
+#Region "Default Method Trainning"
     Public Sub TrainSpecial(TrainType$, Epoch&, setInputList As List(Of Double), setTargetList As List(Of Double), Optional Random As Boolean = False, Optional miniBatchSize& = 2, Optional ByRef oUserform As Object = Nothing)
         Dim ii&, jj&, kk&, T&
         Dim m&, n&, R&
@@ -390,7 +466,7 @@ ErrHandle:
                         'Delta of output layer
                         For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
                             With Layers(Layers.Count - 1).Neurons(ii)
-                                ErrorSignal = ErrorS(.ActivationFunction, .SumWB, .Value)
+                                ErrorSignal = ErrorS(.ActivationFunction, .SumWB)
                                 .Delta = ErrorSignal * (TargetData(m)(ii) - .Value) * (1 - Momentum) + .Delta * Momentum
                             End With
                         Next ii
@@ -400,7 +476,7 @@ ErrHandle:
                                 ErrorSignal = 0
                                 SumES = 0
                                 With Layers(jj).Neurons(kk)
-                                    ErrorSignal = ErrorS(.ActivationFunction, .SumWB, .Value)
+                                    ErrorSignal = ErrorS(.ActivationFunction, .SumWB)
                                     For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
                                         SumES = SumES + Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).Delta
                                     Next ii
@@ -469,7 +545,7 @@ ErrHandle:
                             'Delta of output layer
                             For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
                                 With Layers(Layers.Count - 1).Neurons(ii)
-                                    ErrorSignal = ErrorS(.ActivationFunction, .SumWB, .Value)
+                                    ErrorSignal = ErrorS(.ActivationFunction, .SumWB)
                                     .AccDelta = .AccDelta + ErrorSignal * (TargetData(miniBatch(n))(ii) - .Value) '* (1 - Momentum) + .Delta * Momentum
                                 End With
                             Next ii
@@ -479,7 +555,7 @@ ErrHandle:
                                     ErrorSignal = 0
                                     SumES = 0
                                     With Layers(jj).Neurons(kk)
-                                        ErrorSignal = ErrorS(.ActivationFunction, .SumWB, .Value)
+                                        ErrorSignal = ErrorS(.ActivationFunction, .SumWB)
                                         For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
                                             SumES = SumES + Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).AccDelta
                                         Next ii
@@ -534,7 +610,7 @@ ErrHandle:
                         'Delta of output layer
                         For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
                             With Layers(Layers.Count - 1).Neurons(ii)
-                                ErrorSignal = ErrorS(.ActivationFunction, .SumWB, .Value)
+                                ErrorSignal = ErrorS(.ActivationFunction, .SumWB)
                                 .AccDelta = .AccDelta + ErrorSignal * (TargetData(m)(ii) - .Value) '* (1 - Momentum) + .Delta * Momentum
                             End With
                         Next ii
@@ -544,7 +620,7 @@ ErrHandle:
                                 ErrorSignal = 0
                                 SumES = 0
                                 With Layers(jj).Neurons(kk)
-                                    ErrorSignal = ErrorS(.ActivationFunction, .SumWB, .Value)
+                                    ErrorSignal = ErrorS(.ActivationFunction, .SumWB)
                                     For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
                                         SumES = SumES + Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).AccDelta
                                     Next ii
@@ -583,13 +659,6 @@ ErrHandle:
         Next T
         If Not oUserform Is Nothing Then oUserform.Refresh
     End Sub
-
-
-    '================================================================
-    '//Class for network//
-
-
-
-    '//Support function//
+#End Region
 
 End Class

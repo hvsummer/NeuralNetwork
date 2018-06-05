@@ -6,14 +6,14 @@ we have to train an DNN with those input:
 4- choose the lowest MSE/Learning Rate
 5- 
 
-
-
+Some Ideas:
+1.
 Su dung Neural Net recurrent doc truyen tien hiep
 che tao routine cho nhan vat chinh, nhan vat phu
 su dung timeline theo thoi gian/chuong/su kien
 ghep noi noi dung lai
 
-
+2. new structure of Neural Net
 network su dung 3 dimension chinh
 va hang loat cac attribute phu
 co the nhu trong luong (gravity) / mat do (density)
