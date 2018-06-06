@@ -262,7 +262,7 @@ Public Class NeuralNet
 
         If AF Is Nothing Then
             'AF = New ActivationFunc(AddressOf FunctionList.Activation.Sigmoid)
-            AF = AddressOf FunctionList.Activation.Sigmoid
+            AF = AddressOf FunctionList.Activation.LeakyRELU
         End If
 
         For i = 1 To Epoch
@@ -280,40 +280,72 @@ Public Class NeuralNet
 
         Public NotInheritable Class Activation
 
-            Public Shared Function Sigmoid(Value As Decimal) As Decimal
-                Return 1 / (1 + Math.Exp(-Value))
+            Public Shared Function Sigmoid(Value As Decimal, Optional GD% = 0)
+                If GD = 0 Then
+                    Return 1 / (1 + Math.Exp(-Value))
+                Else
+                    Return Sigmoid(Value) * (1 - Sigmoid(Value))
+                End If
             End Function
 
-            Public Shared Function LeakyRELU(Value As Decimal)
-                Return IIf(Value < 0, 0.01 * Value, Value)
+            Public Shared Function LeakyRELU(Value As Decimal, Optional GD% = 0)
+                If GD = 0 Then
+                    Return IIf(Value < 0, 0.01 * Value, Value)
+                Else
+                    Return IIf(Value < 0, 0.01, 1)
+                End If
             End Function
 
-            Public Shared Function SoftPlus(Value As Decimal)
-                Return Math.Log(1 + Math.Exp(Value))
+            Public Shared Function SoftPlus(Value As Decimal, Optional GD% = 0)
+                If GD = 0 Then
+                    Return Math.Log(1 + Math.Exp(Value))
+                Else
+                    Return 1 / (1 + Math.Abs(Value)) ^ 2
+                End If
             End Function
 
-            Public Shared Function BentIndentity(Value As Decimal)
-                Return ((Value ^ 2 + 1) ^ 0.5 - 1) / 2 + Value
+            Public Shared Function BentIndentity(Value As Decimal, Optional GD% = 0)
+                If GD = 0 Then
+                    Return ((Value ^ 2 + 1) ^ 0.5 - 1) / 2 + Value
+                Else
+                    Return Value / (2 * (Value ^ 2 + 1) ^ 0.5) + 1
+                End If
             End Function
 
         End Class
 
         Public NotInheritable Class Loss
 
-            Public Shared Function Sigmoid(Value As Decimal)
-                Return Activation.Sigmoid(Value) * (1 - Activation.Sigmoid(Value))
+            ''' <summary>
+            ''' Loss function: error is calculated as the difference between the actual output and the predicted output
+            ''' </summary>
+            ''' 
+
+            Public Shared Function Hinge(yHat As List(Of Decimal), y As List(Of Decimal)) As Decimal
+                'Used for classification
+                Dim sum As Decimal
+                For i = 0 To y.Count - 1
+                    sum = Math.Max(0, 1 - yHat(i) * y(i))
+                Next
+                Return sum
             End Function
 
-            Public Shared Function LeakyRELU(Value As Decimal)
-                Return IIf(Value < 0, 0.01, 1)
+            Public Shared Function MAE(yHat As List(Of Decimal), y As List(Of Decimal)) As Decimal
+                'L1 Loss
+                Dim sum As Decimal
+                For i = 0 To y.Count - 1
+                    sum += Math.Abs(yHat(i) - y(i))
+                Next
+                Return sum
             End Function
 
-            Public Shared Function SoftPlus(Value As Decimal)
-                Return 1 / (1 + Math.Abs(Value)) ^ 2
-            End Function
-
-            Public Shared Function BentIndentity(Value As Decimal)
-                Return Value / (2 * (Value ^ 2 + 1) ^ 0.5) + 1
+            Public Shared Function MSE(yHat As List(Of Decimal), y As List(Of Decimal)) As Decimal
+                'L2 Loss
+                Dim sum As Decimal
+                For i = 0 To y.Count - 1
+                    sum += (yHat(i) - y(i)) ^ 2
+                Next
+                Return sum / (2 * y.Count)
             End Function
 
         End Class
@@ -348,9 +380,8 @@ Public Class NeuralNet
         Return ErrorS
     End Function
 
-    Public Function MSE(Optional m& = -1)
+    Public Function method_MSE(Optional m& = -1)
         'Calculate Error RSM
-        Dim ii&
         Dim ErrorSignal As Double = 0
         If m = -1 Then m = CurrentIndex
         For ii = 0 To OutputNum - 1
@@ -359,7 +390,7 @@ Public Class NeuralNet
             End With
         Next ii
 
-        Return 0.5 * ErrorSignal / OutputNum
+        Return ErrorSignal / (2 * OutputNum)
     End Function
 
 #Region "Method to Set Input/Target Network"
@@ -391,7 +422,7 @@ Public Class NeuralNet
 #End Region
 
     '//Execute input with calculate
-    Public Function Calculate()
+    Public Overloads Function Calculate()
         Dim ii&, jj&, k&
         Dim sum#
         On Error GoTo ErrHandle
@@ -404,8 +435,7 @@ Public Class NeuralNet
                     For k = 0 To Layers(ii - 1).Neurons.Count - 1
                         sum = sum + Layers(ii - 1).Neurons(k).Value * .Weights(k)
                     Next k
-                    .SumWB = sum + .Bias
-                    .Value = ActiveF(.ActivationFunction, .SumWB)
+                    .Value = ActiveF(.ActivationFunction, sum + .Bias)
                 End With
             Next
         Next
@@ -414,7 +444,28 @@ Public Class NeuralNet
 ErrHandle:
         Debug.Print(" Error while calculate network!! " & vbTab & Err.Description)
     End Function
-
+    Public Overloads Function Calculate(AF As ActivationFunc)
+        Dim ii&, jj&, k&
+        Dim sum#
+        On Error GoTo ErrHandle
+        Calculate = False
+        For ii = 1 To Layers.Count - 1
+            For jj = 0 To Layers(ii).Neurons.Count - 1
+                With Layers(ii).Neurons(jj)
+                    'Perf_Lap()
+                    sum = 0
+                    For k = 0 To Layers(ii - 1).Neurons.Count - 1
+                        sum = sum + Layers(ii - 1).Neurons(k).Value * .Weights(k)
+                    Next k
+                    .Value = AF.Invoke(sum + .Bias)
+                End With
+            Next
+        Next
+        Calculate = True
+        Exit Function
+ErrHandle:
+        Debug.Print(" Error while calculate network!! " & vbTab & Err.Description)
+    End Function
 
 #Region "Default Method Trainning"
     Public Sub TrainSpecial(TrainType$, Epoch&, setInputList As List(Of Double), setTargetList As List(Of Double), Optional Random As Boolean = False, Optional miniBatchSize& = 2, Optional ByRef oUserform As Object = Nothing)
@@ -466,7 +517,8 @@ ErrHandle:
                         'Delta of output layer
                         For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
                             With Layers(Layers.Count - 1).Neurons(ii)
-                                ErrorSignal = ErrorS(.ActivationFunction, .SumWB)
+                                ErrorSignal = ErrorS(.ActivationFunction, .Value)
+                                'New * (1-p) + Old * p ; New = GD of Activation * GD of Loss
                                 .Delta = ErrorSignal * (TargetData(m)(ii) - .Value) * (1 - Momentum) + .Delta * Momentum
                             End With
                         Next ii
@@ -476,7 +528,8 @@ ErrHandle:
                                 ErrorSignal = 0
                                 SumES = 0
                                 With Layers(jj).Neurons(kk)
-                                    ErrorSignal = ErrorS(.ActivationFunction, .SumWB)
+                                    ErrorSignal = ErrorS(.ActivationFunction, .Value)
+                                    'New in this situation = GD of Activation * Sum of (Weight(i+1) * Delta(i+1)) of layer i + 1 
                                     For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
                                         SumES = SumES + Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).Delta
                                     Next ii
@@ -501,7 +554,7 @@ ErrHandle:
                         'SGD Feedforward and backpropangation update 1 by 1
                         Me.st_Updated_N = Me.st_FF
 
-                        ErrAccumulated = ErrAccumulated + MSE()
+                        ErrAccumulated = ErrAccumulated + method_MSE()
                         If Not oUserform Is Nothing Then oUserform.Refresh
                     Next m
 
@@ -545,7 +598,7 @@ ErrHandle:
                             'Delta of output layer
                             For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
                                 With Layers(Layers.Count - 1).Neurons(ii)
-                                    ErrorSignal = ErrorS(.ActivationFunction, .SumWB)
+                                    ErrorSignal = ErrorS(.ActivationFunction, .Value)
                                     .AccDelta = .AccDelta + ErrorSignal * (TargetData(miniBatch(n))(ii) - .Value) '* (1 - Momentum) + .Delta * Momentum
                                 End With
                             Next ii
@@ -555,7 +608,7 @@ ErrHandle:
                                     ErrorSignal = 0
                                     SumES = 0
                                     With Layers(jj).Neurons(kk)
-                                        ErrorSignal = ErrorS(.ActivationFunction, .SumWB)
+                                        ErrorSignal = ErrorS(.ActivationFunction, .Value)
                                         For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
                                             SumES = SumES + Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).AccDelta
                                         Next ii
@@ -565,7 +618,7 @@ ErrHandle:
                             Next jj
 
                             'Calculate Error MSE
-                            ErrAccumulated = ErrAccumulated + MSE()
+                            ErrAccumulated = ErrAccumulated + method_MSE()
                             If Not oUserform Is Nothing Then oUserform.Refresh
                         Next n
 
@@ -610,7 +663,7 @@ ErrHandle:
                         'Delta of output layer
                         For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
                             With Layers(Layers.Count - 1).Neurons(ii)
-                                ErrorSignal = ErrorS(.ActivationFunction, .SumWB)
+                                ErrorSignal = ErrorS(.ActivationFunction, .Value)
                                 .AccDelta = .AccDelta + ErrorSignal * (TargetData(m)(ii) - .Value) '* (1 - Momentum) + .Delta * Momentum
                             End With
                         Next ii
@@ -620,7 +673,7 @@ ErrHandle:
                                 ErrorSignal = 0
                                 SumES = 0
                                 With Layers(jj).Neurons(kk)
-                                    ErrorSignal = ErrorS(.ActivationFunction, .SumWB)
+                                    ErrorSignal = ErrorS(.ActivationFunction, .Value)
                                     For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
                                         SumES = SumES + Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).AccDelta
                                     Next ii
@@ -631,7 +684,7 @@ ErrHandle:
 
 
                         'Calculate Error MSE
-                        ErrAccumulated = ErrAccumulated + MSE()
+                        ErrAccumulated = ErrAccumulated + method_MSE()
                     Next m
 
                     'Update

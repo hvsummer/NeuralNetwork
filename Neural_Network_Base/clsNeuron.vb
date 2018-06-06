@@ -5,7 +5,6 @@
     Public IDGlobal$
     Public ActivationFunction$
     Public Bias#
-    Public SumWB#
     Public Delta#
     Public AccDelta#
     Public Value#
@@ -44,7 +43,6 @@
                 .Add(IDGlobal)
                 .Add(Me.ActivationFunction)
                 .Add(Me.Bias)
-                .Add(Me.SumWB)
                 .Add(Me.Delta)
                 .Add(Me.AccDelta)
                 .Add(Value)
@@ -58,11 +56,10 @@
                 .IDGlobal = gen(1)
                 .ActivationFunction = gen(2)
                 .Bias = gen(3)
-                .SumWB = gen(4)
-                .Delta = gen(5)
-                .AccDelta = gen(6)
-                Value = gen(7)
-                Weights.ImportFromArray(Split(gen(8), "|"))
+                .Delta = gen(4)
+                .AccDelta = gen(5)
+                Value = gen(6)
+                Weights.ImportFromArray(Split(gen(7), "|"))
             End With
         End Set
     End Property
