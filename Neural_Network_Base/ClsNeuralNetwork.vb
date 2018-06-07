@@ -319,7 +319,7 @@ Public Class NeuralNet
             ''' <summary>
             ''' Loss function: error is calculated as the difference between the actual output and the predicted output
             ''' </summary>
-            ''' 
+
 
             Public Shared Function Hinge(yHat As List(Of Decimal), y As List(Of Decimal)) As Decimal
                 'Used for classification

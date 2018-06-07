@@ -131,6 +131,7 @@
     <Compile Include="clsLayer.vb" />
     <Compile Include="clsNeuron.vb" />
     <Compile Include="DbBrigde.vb" />
+    <Compile Include="clsArrayNeural.vb" />
     <Compile Include="Mod_SupportFunc.vb" />
     <Compile Include="clsNeuralNetwork.vb" />
     <Compile Include="MainGUI.vb">
@@ -140,7 +141,7 @@
       <DependentUpon>MainGUI.vb</DependentUpon>
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="Module_SupportModTimer.vb" />
+    <Compile Include="Mod_Performance.vb" />
     <Compile Include="My Project\AssemblyInfo.vb" />
     <Compile Include="My Project\Application.Designer.vb">
       <AutoGen>True</AutoGen>

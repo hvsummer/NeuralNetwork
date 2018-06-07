@@ -1,6 +1,6 @@
 ﻿Option Explicit On
 
-Module Module_SupportModTimer
+Module Mod_Timer_Perf
     Private CTime As Double
     Private wTime As Stopwatch
     ' ****************************************************************
@@ -23,4 +23,20 @@ Module Module_SupportModTimer
         wTime.Start()
         Return res
     End Function
+
+End Module
+
+Module Mod_Memory_Perf
+    Private Mem&
+
+    Public Sub Memory_Start()
+        GC.Collect()
+        GC.WaitForPendingFinalizers()
+        GC.Collect()
+        Mem = Process.GetCurrentProcess().WorkingSet64
+    End Sub
+    Public Function Memory_Meansure() As Long
+        Return Process.GetCurrentProcess().WorkingSet64 - Mem
+    End Function
+
 End Module
