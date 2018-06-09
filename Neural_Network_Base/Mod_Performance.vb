@@ -4,24 +4,26 @@ Module Mod_Timer_Perf
     Private CTime As Double
     Private wTime As Stopwatch
     ' ****************************************************************
-    Public Function GetTime()
-        Dim res As Double = DateTime.Now.ToOADate
-        CTime = DateTime.Now.ToOADate
-        Return Math.Round(res - CTime, 6)
+    Public Function GetTime() As Double
+        Dim res As Double = CTime
+        CTime = Date.Now.ToOADate
+        Return Math.Round((CTime - res) * 10 ^ 5, 6)
     End Function
+
     Public Sub setTime()
-        CTime = DateTime.Now.ToOADate
+        CTime = Date.Now.ToOADate
     End Sub
+
     Public Sub Perf_Start()
         If wTime Is Nothing Then wTime = New Stopwatch
         wTime.Start()
     End Sub
+
     Public Function Perf_Lap() As Double
-        Dim res As Double
-        res = wTime.Elapsed.TotalMilliseconds
+        Dim res As Double = wTime.Elapsed.TotalMilliseconds
         wTime.Reset()
         wTime.Start()
-        Return res
+        Return Math.Round(res, 6)
     End Function
 
 End Module

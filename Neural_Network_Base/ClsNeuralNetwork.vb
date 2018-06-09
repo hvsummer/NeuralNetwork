@@ -31,6 +31,9 @@ Public Class NeuralNet
     Public st_CurrEpoch&
     Public CurrentIndex&
 
+    Private MaxEpoch&
+    Private ElapsedTime&
+
     '2 set of input data and target data using in each loop
     Public InData As List(Of List(Of Double))
     Public TargetData As List(Of List(Of Double))
@@ -58,6 +61,20 @@ Public Class NeuralNet
             End With
         End Set
     End Property
+
+    Public ReadOnly Property Process() As String
+        Get
+            Dim strB As New Text.StringBuilder
+            ElapsedTime += Perf_Lap()
+            strB.Append("Status: FF(").Append(st_FF).Append(" - ").Append(Math.Round(st_FF / ElapsedTime, 2))
+            strB.Append(") Updated(").Append(st_Updated_N).Append(" - ").Append(Math.Round(st_Updated_N / ElapsedTime, 2))
+            strB.Append(") Epoch(").Append(st_CurrEpoch).Append("/").Append(MaxEpoch).Append(" - ").Append(Math.Round(st_CurrEpoch / MaxEpoch * 100, 2))
+            strB.Append(") EpS(").Append(Math.Round(st_CurrEpoch / ElapsedTime, 2))
+            strB.Append(") - ").Append(Math.Round(ElapsedTime, 4)).Append(" sec.")
+            Return strB.ToString
+        End Get
+    End Property
+
     Public ReadOnly Property InputNum&()
         Get
             InputNum = Layers(0).Neurons.Count
@@ -103,32 +120,34 @@ Public Class NeuralNet
     Public ReadOnly Property Network_Information()
         Get
             Dim ii&, jj&
-            Dim Str = ""
+            Dim Str As New Text.StringBuilder
             For ii = 0 To Me.Layers.Count - 1
-                For jj = 0 To Me.Layers(ii).Neurons.Count - 1
-                    If Len(Str) = 0 Then
-                        Str = Me.Layers(ii).Neurons(jj).Info
+                For jj = 0 To Me.Layers.Item(ii).Neurons.Count - 1
+                    If Str.Length = 0 Then
+                        Str.Append(Layers.Item(ii).Neurons.Item(jj).Info)
                     Else
-                        Str = Str & vbCrLf & Me.Layers(ii).Neurons(jj).Info
+                        Str.Append(vbCrLf).Append(Me.Layers.Item(ii).Neurons.Item(jj).Info)
                     End If
                 Next
             Next
-            Return Str
+            Return Str.ToString
         End Get
     End Property
     Public ReadOnly Property Network_Structure()
         Get
             Dim ii&
-            Dim str$ = ""
+            Dim str As New Text.StringBuilder
+
             For ii = 1 To Me.Layers.Count - 2
-                If Len(str) = 0 Then
-                    str = Me.Layers(ii).Neurons.Count & "." & Me.Layers(ii).Neurons(0).ActivationFunction
+                If str.Length = 0 Then
+                    str.Append(Layers.Item(ii).Neurons.Count).Append(".").Append(Layers.Item(ii).Neurons.Item(0).ActivationFunction)
                 Else
-                    str = str & "+" & Me.Layers(ii).Neurons.Count & "." & Me.Layers(ii).Neurons(0).ActivationFunction
+                    str.Append("+").Append(Layers.Item(ii).Neurons.Count).Append(".").Append(Layers.Item(ii).Neurons.Item(0).ActivationFunction)
                 End If
             Next ii
-            str = str & "=" & Me.Layers(Me.Layers.Count - 1).Neurons.Count & "." & Me.Layers(Me.Layers.Count - 1).Neurons(0).ActivationFunction
-            Return Me.Layers(0).Neurons.Count & "=" & str
+            str.Append("=").Append(Me.Layers.Item(Me.Layers.Count - 1).Neurons.Count).Append(".").Append(Me.Layers.Item(Me.Layers.Count - 1).Neurons.Item(0).ActivationFunction)
+
+            Return Me.Layers.Item(0).Neurons.Count & "=" & str.ToString
         End Get
     End Property
     Public ReadOnly Property Result(Optional Deli$ = "|") As String
@@ -365,6 +384,7 @@ Public Class NeuralNet
             Case Else
                 ActiveF = sum
         End Select
+        Return ActiveF
     End Function
     Private Function ErrorS(AFType As String, sum As Double) As Double
         Select Case AFType
@@ -423,39 +443,38 @@ Public Class NeuralNet
 
     '//Execute input with calculate
     Public Overloads Function Calculate()
-        Dim ii&, jj&, k&
         Dim sum#
-        On Error GoTo ErrHandle
-        Calculate = False
-        For ii = 1 To Layers.Count - 1
-            For jj = 0 To Layers(ii).Neurons.Count - 1
-                With Layers(ii).Neurons(jj)
-                    'Perf_Lap()
-                    sum = 0
-                    For k = 0 To Layers(ii - 1).Neurons.Count - 1
-                        sum = sum + Layers(ii - 1).Neurons(k).Value * .Weights(k)
-                    Next k
-                    .Value = ActiveF(.ActivationFunction, sum + .Bias)
-                End With
+        Try
+            For ii = 1 To Layers.Count - 1
+                For jj = 0 To Layers.Item(ii).Neurons.Count - 1
+                    With Layers.Item(ii).Neurons.Item(jj)
+                        'Perf_Lap()
+                        sum = 0
+                        For k = 0 To Layers.Item(ii - 1).Neurons.Count - 1
+                            sum = sum + Layers.Item(ii - 1).Neurons.Item(k).Value * .Weights.Item(k)
+                        Next k
+                        .Value = ActiveF(.ActivationFunction, sum + .Bias)
+                    End With
+                Next
             Next
-        Next
-        Calculate = True
-        Exit Function
-ErrHandle:
-        Debug.Print(" Error while calculate network!! " & vbTab & Err.Description)
+            Return True
+        Catch e As Exception
+            Debug.Print(" Error while calculate network!! " & vbTab & Err.Description & vbCrLf & e.Message)
+            Return False
+        End Try
+
     End Function
     Public Overloads Function Calculate(AF As ActivationFunc)
-        Dim ii&, jj&, k&
         Dim sum#
         On Error GoTo ErrHandle
         Calculate = False
         For ii = 1 To Layers.Count - 1
-            For jj = 0 To Layers(ii).Neurons.Count - 1
-                With Layers(ii).Neurons(jj)
+            For jj = 0 To Layers.Item(ii).Neurons.Count - 1
+                With Layers.Item(ii).Neurons.Item(jj)
                     'Perf_Lap()
                     sum = 0
-                    For k = 0 To Layers(ii - 1).Neurons.Count - 1
-                        sum = sum + Layers(ii - 1).Neurons(k).Value * .Weights(k)
+                    For k = 0 To Layers.Item(ii - 1).Neurons.Count - 1
+                        sum = sum + Layers.Item(ii - 1).Neurons.Item(k).Value * .Weights.Item(k)
                     Next k
                     .Value = AF.Invoke(sum + .Bias)
                 End With
@@ -469,8 +488,7 @@ ErrHandle:
 
 #Region "Default Method Trainning"
     Public Sub TrainSpecial(TrainType$, Epoch&, setInputList As List(Of Double), setTargetList As List(Of Double), Optional Random As Boolean = False, Optional miniBatchSize& = 2, Optional ByRef oUserform As Object = Nothing)
-        Dim ii&, jj&, kk&, T&
-        Dim m&, n&, R&
+
         Dim ErrorSignal#, SumES#
         Dim ErrAccumulated#
 
@@ -479,6 +497,8 @@ ErrHandle:
 
         If setInputList Is Nothing Or setTargetList Is Nothing Then Exit Sub
 
+        Perf_Start()
+        ElapsedTime = Perf_Lap()
         'New Train Method
         'Input all input by list object, 1 by 1 to inputList with Setinput method
         'Use batchSize to get from list
@@ -490,17 +510,20 @@ ErrHandle:
         st_Updated_N = 0
         st_Input = ""
         st_CurrEpoch = 0
+        MaxEpoch = Epoch
+
 
         'SGD = loop 1 by 1
         'Batch = loop all item, accumulate all delta then update 1 time
         'Mini-Batch = loop all mini batch, accumulate all delta then update at the end of mini batch, next minibatch
 
         'Main section
-        For T = 1 To Epoch
-            Me.st_CurrEpoch = T
-            Select Case TrainType
-                Case "Stochastic"
 
+        Select Case TrainType
+            Case "Stochastic"
+                For T = 1 To Epoch
+                    Me.st_CurrEpoch = T
+#Region "Stochastic"
                     ErrAccumulated = 0
                     For m = 0 To InData.Count - 1
                         '//Feedforward
@@ -511,7 +534,7 @@ ErrHandle:
                         If SetInput(InData(m)) = False Then Exit Sub
                         CurrentIndex = m
                         Calculate()
-                        Me.st_FF = st_FF + 1
+                        Me.st_FF += 1
 
                         'Backward propangation
                         'Delta of output layer
@@ -531,7 +554,7 @@ ErrHandle:
                                     ErrorSignal = ErrorS(.ActivationFunction, .Value)
                                     'New in this situation = GD of Activation * Sum of (Weight(i+1) * Delta(i+1)) of layer i + 1 
                                     For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
-                                        SumES = SumES + Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).Delta
+                                        SumES += Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).Delta
                                     Next ii
                                     .Delta = ErrorSignal * SumES * (1 - Momentum) + .Delta * Momentum
                                 End With
@@ -543,10 +566,10 @@ ErrHandle:
                             For jj = 0 To Layers(ii).Neurons.Count - 1
                                 With Layers(ii).Neurons(jj)
                                     'Update Bias
-                                    .Bias = .Bias + (Me.LearningRate * .Delta)
+                                    .Bias += (Me.LearningRate * .Delta)
                                     'Update Weight
                                     For kk = 0 To .Weights.Count - 1
-                                        .Weights(kk) = .Weights(kk) + (Me.LearningRate * .Delta * Layers(ii - 1).Neurons(kk).Value)
+                                        .Weights(kk) += (Me.LearningRate * .Delta * Layers(ii - 1).Neurons(kk).Value)
                                     Next kk
                                 End With
                             Next jj
@@ -554,16 +577,21 @@ ErrHandle:
                         'SGD Feedforward and backpropangation update 1 by 1
                         Me.st_Updated_N = Me.st_FF
 
-                        ErrAccumulated = ErrAccumulated + method_MSE()
-                        If Not oUserform Is Nothing Then oUserform.Refresh
+                        ErrAccumulated += method_MSE()
+                        If Not oUserform Is Nothing Then oUserform.Update
                     Next m
 
                     ErrAccumulated = ErrAccumulated / InData.Count
                     globalError = ErrAccumulated
                     errList.Add(globalError)
-
-                Case "Mini-Batch"
-
+#End Region
+                    ElapsedTime += Perf_Lap()
+                    If Not oUserform Is Nothing Then oUserform.Update
+                Next T
+            Case "Mini-Batch"
+                For T = 1 To Epoch
+                    Me.st_CurrEpoch = T
+#Region "Mini-Batch"
                     ErrAccumulated = 0
                     If miniBatchSize >= 0.55 * InData.Count Then
                         Select Case InData.Count
@@ -592,14 +620,14 @@ ErrHandle:
                             If SetInput(InData(miniBatch(n))) = False Then Exit Sub
                             CurrentIndex = miniBatch(n)
                             Calculate()
-                            Me.st_FF = st_FF + 1
+                            Me.st_FF += 1
 
                             'Backward propangation
                             'Delta of output layer
                             For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
                                 With Layers(Layers.Count - 1).Neurons(ii)
                                     ErrorSignal = ErrorS(.ActivationFunction, .Value)
-                                    .AccDelta = .AccDelta + ErrorSignal * (TargetData(miniBatch(n))(ii) - .Value) '* (1 - Momentum) + .Delta * Momentum
+                                    .AccDelta += ErrorSignal * (TargetData(miniBatch(n))(ii) - .Value) '* (1 - Momentum) + .Delta * Momentum
                                 End With
                             Next ii
                             'Delta of hidden layer
@@ -610,7 +638,7 @@ ErrHandle:
                                     With Layers(jj).Neurons(kk)
                                         ErrorSignal = ErrorS(.ActivationFunction, .Value)
                                         For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
-                                            SumES = SumES + Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).AccDelta
+                                            SumES += Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).AccDelta
                                         Next ii
                                         .AccDelta = ErrorSignal * SumES '* (1 - Momentum) + .Delta * Momentum
                                     End With
@@ -618,8 +646,8 @@ ErrHandle:
                             Next jj
 
                             'Calculate Error MSE
-                            ErrAccumulated = ErrAccumulated + method_MSE()
-                            If Not oUserform Is Nothing Then oUserform.Refresh
+                            ErrAccumulated += method_MSE()
+                            If Not oUserform Is Nothing Then oUserform.Update
                         Next n
 
                         'Update
@@ -627,26 +655,32 @@ ErrHandle:
                             For jj = 0 To Layers(ii).Neurons.Count - 1
                                 With Layers(ii).Neurons(jj)
                                     'Update Bias
-                                    .Bias = .Bias + (LearningRate * .Delta)
+                                    .Bias += (LearningRate * .Delta)
                                     'Update Weight
                                     For kk = 0 To .Weights.Count - 1
-                                        .Weights(kk) = .Weights(kk) + (LearningRate * Layers(ii - 1).Neurons(kk).Value) * (.AccDelta * (1 - Momentum) + .Delta * Momentum)
+                                        .Weights(kk) += (LearningRate * Layers(ii - 1).Neurons(kk).Value) * (.AccDelta * (1 - Momentum) + .Delta * Momentum)
                                         .Delta = .AccDelta
                                         .AccDelta = 0
                                     Next kk
                                 End With
                             Next jj
                         Next ii
-                        Me.st_Updated_N = st_Updated_N + 1
-                        If Not oUserform Is Nothing Then oUserform.Refresh
+                        Me.st_Updated_N += 1
+                        If Not oUserform Is Nothing Then oUserform.Update
 
                     Next m
 
-                    ErrAccumulated = ErrAccumulated / m
+                    ErrAccumulated = ErrAccumulated / InData.Count
                     globalError = ErrAccumulated
                     errList.Add(globalError)
-
-                Case "Batch"
+#End Region
+                    ElapsedTime += Perf_Lap()
+                    If Not oUserform Is Nothing Then oUserform.Update
+                Next T
+            Case "Batch"
+                For T = 1 To Epoch
+                    Me.st_CurrEpoch = T
+#Region "Batch"
                     ErrAccumulated = 0
 
                     For m = 0 To InData.Count - 1
@@ -657,14 +691,14 @@ ErrHandle:
                         If SetInput(InData(m)) = False Then Exit Sub
                         CurrentIndex = m
                         Calculate()
-                        Me.st_FF = st_FF + 1
-                        If Not oUserform Is Nothing Then oUserform.Refresh
+                        Me.st_FF += 1
+                        If Not oUserform Is Nothing Then oUserform.Update
                         'Backward propangation
                         'Delta of output layer
                         For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
                             With Layers(Layers.Count - 1).Neurons(ii)
                                 ErrorSignal = ErrorS(.ActivationFunction, .Value)
-                                .AccDelta = .AccDelta + ErrorSignal * (TargetData(m)(ii) - .Value) '* (1 - Momentum) + .Delta * Momentum
+                                .AccDelta += ErrorSignal * (TargetData(m)(ii) - .Value) '* (1 - Momentum) + .Delta * Momentum
                             End With
                         Next ii
                         'Delta of hidden layer
@@ -675,7 +709,7 @@ ErrHandle:
                                 With Layers(jj).Neurons(kk)
                                     ErrorSignal = ErrorS(.ActivationFunction, .Value)
                                     For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
-                                        SumES = SumES + Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).AccDelta
+                                        SumES += Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).AccDelta
                                     Next ii
                                     .AccDelta = ErrorSignal * SumES '* (1 - Momentum) + .Delta * Momentum
                                 End With
@@ -692,26 +726,38 @@ ErrHandle:
                         For jj = 0 To Layers(ii).Neurons.Count - 1
                             With Layers(ii).Neurons(jj)
                                 'Update Bias
-                                .Bias = .Bias + (Me.LearningRate * .Delta)
+                                .Bias += (Me.LearningRate * .Delta)
                                 'Update Weight
                                 For kk = 0 To .Weights.Count - 1
-                                    .Weights(kk) = .Weights(kk) + (Me.LearningRate * Layers(ii - 1).Neurons(kk).Value) * (.AccDelta * (1 - Momentum) + .Delta * Momentum)
+                                    .Weights(kk) += (Me.LearningRate * Layers(ii - 1).Neurons(kk).Value) * (.AccDelta * (1 - Momentum) + .Delta * Momentum)
                                     .Delta = .AccDelta
                                     .AccDelta = 0
                                 Next kk
                             End With
                         Next jj
                     Next ii
-                    Me.st_Updated_N = st_Updated_N + 1
-                    If Not oUserform Is Nothing Then oUserform.Refresh0
-                    ErrAccumulated = ErrAccumulated / m
+
+                    Me.st_Updated_N += 1
+
+                    If Not oUserform Is Nothing Then oUserform.Update0
+
+                    ErrAccumulated = ErrAccumulated / InData.Count
                     globalError = ErrAccumulated
                     errList.Add(globalError)
-            End Select
-            If Not oUserform Is Nothing Then oUserform.Refresh
-        Next T
-        If Not oUserform Is Nothing Then oUserform.Refresh
-    End Sub
 #End Region
+                    ElapsedTime += Perf_Lap()
+                    If Not oUserform Is Nothing Then oUserform.Update
+                Next T
+        End Select
+        ElapsedTime += Perf_Lap()
+        If Not oUserform Is Nothing Then oUserform.Update
+    End Sub
+
+#End Region
+
+End Class
+
+
+Public Class NN_Array
 
 End Class

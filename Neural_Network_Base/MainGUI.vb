@@ -1,5 +1,6 @@
 ﻿Option Explicit On
 Imports System.Text.RegularExpressions
+Imports System.Text
 
 Public Class GUI
     Private DNN As NeuralNet
@@ -284,12 +285,14 @@ Public Class GUI
         End With
     End Sub
 
-    Public Overrides Sub Refresh()
+    Public Overloads Sub Update(Optional Final$ = "")
         Dim d&
         Dim Delta$ = "", AccDelta$ = ""
-        With DNN
-            TrClock(0) = TrClock(0) + GetTime()
-            If TrClock(0) - TrClock(1) >= 1 Then
+
+        Try
+            With DNN
+                TrClock(0) += GetTime()
+                'If TrClock(0) - TrClock(1) >= 1 Or Len(Final) > 0 Then
                 '//update value on screen
                 'Me.Repaint
                 tbDebugInput.Text = .st_Input
@@ -298,31 +301,34 @@ Public Class GUI
                 tbDelta.Text = ""
                 For d = 0 To .Layers(.Layers.Count - 1).Neurons.Count - 1
                     If Len(Delta) = 0 Then
-                        Delta = .Layers(.Layers.Count - 1).Neurons(d).Delta
+                        Delta = Math.Round(.Layers(.Layers.Count - 1).Neurons(d).Delta, 15)
                     Else
-                        Delta = Delta & "|" & .Layers(.Layers.Count - 1).Neurons(d).Delta
+                        Delta &= "|" & Math.Round(.Layers(.Layers.Count - 1).Neurons(d).Delta, 15)
                     End If
                     If Len(AccDelta) = 0 Then
-                        AccDelta = .Layers(.Layers.Count - 1).Neurons(d).AccDelta
+                        AccDelta = Math.Round(.Layers(.Layers.Count - 1).Neurons(d).AccDelta, 15)
                     Else
-                        AccDelta = AccDelta & "|" & .Layers(.Layers.Count - 1).Neurons(d).AccDelta
+                        AccDelta &= "|" & Math.Round(.Layers(.Layers.Count - 1).Neurons(d).AccDelta, 15)
                     End If
                 Next d
-                tbDelta.Text = Math.Round(CDbl(Delta), 15) & vbCrLf & Math.Round(CDbl(AccDelta), 15)
+                tbDelta.Text = Delta & vbCrLf & AccDelta
 
                 tbDebugOutput.Visible = False
                 tbDebugOutput.Visible = True
-                Me.tbGlobalError.Text = Math.Round(.globalError, 15).ToString("R")
-                tbStatus.Text = "Status: FF(" & .st_FF & " - " & Math.Round(.st_FF / TrClock(0), 2) _
-                                    & ") Updated(" & .st_Updated_N & " - " & Math.Round(.st_Updated_N / TrClock(1), 2) _
-                                    & ") Epoch(" & .st_CurrEpoch & "/" & cbEpoch.Text & " - " & Math.Round(.st_CurrEpoch / cbEpoch.Text * 100, 2) _
-                                    & ") EpS(" & Math.Round(.st_CurrEpoch / TrClock(0), 2) _
-                                    & ") - " & Math.Round(TrClock(0), 4) & " sec."
+                tbGlobalError.Text = Math.Round(.globalError, 15).ToString("R")
+
+
+                tbStatus.Text = .Process
+
                 If MP.SelectedIndex = 1 Then Me.tbInfo_Click(Me, New EventArgs())
                 TrClock(1) = TrClock(0)
-            End If
-            Application.DoEvents()
-        End With
+                Application.DoEvents()
+                'End If
+
+            End With
+        Catch e As Exception
+            Console.WriteLine("Error occurs: " & e.Message)
+        End Try
     End Sub
 
 
@@ -374,7 +380,7 @@ Public Class GUI
         DNN = New NeuralNet
         DB = New LiteDb("NNStore.db")
         createDefaultTable()
-        Console.WriteLine(DB.FullPath)
+        'Console.WriteLine(DB.FullPath)
 
         cbNetSetting.Items.AddRange(DB.Query("SELECT Value_Setting FROM Settinglist").toArray())
         If DB.Query("SELECT * FROM TrainingSET").Rows.Count > 0 Then

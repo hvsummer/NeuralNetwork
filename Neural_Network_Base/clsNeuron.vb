@@ -20,18 +20,20 @@
 
     Public ReadOnly Property Info()
         Get
+            Dim Builder As New Text.StringBuilder
             'Neuron information will have 2 part
             '1 general information: type, Id
             '2 It''s value
-            Info = IDGlobal & "-" & ActivationFunction
-            Info = Info & vbTab & "Bias=" & Math.Round(Bias, 6) & IIf(Len(Bias) > 6, "...", "") & StrDup(Math.Max(0, 8 - Len(Math.Round(Bias, 6))), " "c)
-            Info = Info & vbTab & "Delta=" & Math.Round(Delta, 6) & IIf(Len(Delta) > 6, "...", "") & StrDup(Math.Max(0, 8 - Len(Math.Round(Delta, 6))), " "c)
-            Info = Info & vbTab & "Output=" & Math.Round(Value, 6)
+            Builder.Append(IDGlobal).Append("-").Append(ActivationFunction).Append(vbTab)
+            Builder.Append("Bias=").Append(Math.Round(Bias, 6)).Append(IIf(Len(Bias) > 6, "...", "")).Append(StrDup(Math.Max(0, 8 - Len(Math.Round(Bias, 6))), " "c)).Append(vbTab)
+            Builder.Append("Delta=").Append(Math.Round(Delta, 6)).Append(IIf(Len(Delta) > 6, "...", "")).Append(StrDup(Math.Max(0, 8 - Len(Math.Round(Delta, 6))), " "c)).Append(vbTab)
+            Builder.Append("Output=").Append(Math.Round(Value, 6)).Append(vbTab)
             If Split(IDGlobal, "-")(0) = "1" Then
-                Info = Info & vbTab & "Weights=" & "Null"
+                Builder.Append("Weights=").Append("Null")
             Else
-                Info = Info & vbTab & "Weights=" & Weights.ToStr("|")
+                Builder.Append("Weights=").Append(Weights.ToStr("|"))
             End If
+            Return Builder.ToString
         End Get
     End Property
     Public Property DNA() As List(Of String)
