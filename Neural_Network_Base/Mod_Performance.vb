@@ -23,8 +23,11 @@ Module Mod_Timer_Perf
         Dim res As Double = wTime.Elapsed.TotalMilliseconds
         wTime.Reset()
         wTime.Start()
-        Return Math.Round(res, 6)
+        Return Math.Round(res, 6) / 1000
     End Function
+    Public Sub Perf_Stop()
+        If wTime Is Nothing Then wTime.Reset()
+    End Sub
 
 End Module
 
