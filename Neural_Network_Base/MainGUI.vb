@@ -25,7 +25,7 @@ Public Class GUI
         tbDebugOutput.Text = ""
 
         With DNN
-            .SetInput(C2List(tbDebugInput.Text).ConvertAll(Of Double)(New Converter(Of Object, Double)(Function(x) CDbl(x))))
+            .SetInput(C2List(tbDebugInput.Text).ConvertAll(New Converter(Of Object, Double)(Function(x) CDbl(x))))
             .Calculate()
 
             'Update string Result array
@@ -40,8 +40,8 @@ Public Class GUI
         Dim listArr1, listArr2 As List(Of Double)
         If DNN.Active = False Or DNN.Trained_Time = 0 Then MsgBox("Neural Network was not trained, please train it first !!") : Exit Sub
 
-        listArr1 = C2List(tbInput.Text).ConvertAll(Of Double)(New Converter(Of String, Double)(Function(x) CDbl(x)))
-        listArr2 = C2List(tbTarget.Text).ConvertAll(Of Double)(New Converter(Of String, Double)(Function(x) CDbl(x)))
+        listArr1 = C2List(tbInput.Text).ConvertAll(New Converter(Of String, Double)(Function(x) CDbl(x)))
+        listArr2 = C2List(tbTarget.Text).ConvertAll(New Converter(Of String, Double)(Function(x) CDbl(x)))
 
         With DNN
             .PrepareInOut(listArr1, listArr2)
@@ -231,6 +231,7 @@ Public Class GUI
         myTimer.Enabled = False
         UpdateWP()
         Console.WriteLine(String.Format("Trained Time:{0} -- Trained Epoch:{1}", DNN.Trained_Time, DNN.Trained_Total_Epoch))
+        Console.WriteLine(String.Format("Number of loop time:{0}", DNN.test.Length))
     End Sub
 
     '****************************************************************************************************************************************

@@ -1,8 +1,5 @@
 ﻿Option Explicit On
 
-
-'Imports Neural_Network_Base
-
 Public Structure Status
     Public st_FF%
     Public st_Updated_N%
@@ -37,6 +34,7 @@ Public Class NeuralNet
     Private MaxEpoch%
     Public Trained_Total_Epoch%
     Public Trained_Time%
+    Public test As New Text.StringBuilder
 
     Public ElapsedTime#
 
@@ -192,6 +190,7 @@ Public Class NeuralNet
                 'Update string Result array
                 s.Append(Current_Result).Append(Deli)
             Next
+            Console.WriteLine("Result: " + s.ToString)
             Return s.ToString
         End Get
     End Property
@@ -334,85 +333,6 @@ Public Class NeuralNet
 
     End Sub
 
-    Public NotInheritable Class FunctionList
-
-        ''' <summary>
-        ''' list of Default function support for Activation and Loss
-        ''' </summary>
-
-        Public NotInheritable Class Activation
-
-            Public Shared Function Sigmoid(Value As Double, Optional GD% = 0) As Double
-                If GD = 0 Then
-                    Return 1 / (1 + Math.Exp(-Value))
-                Else
-                    Return Sigmoid(Value) * (1 - Sigmoid(Value))
-                End If
-            End Function
-
-            Public Shared Function LeakyRELU(Value As Double, Optional GD% = 0) As Double
-                If GD = 0 Then
-                    Return If(Value < 0, 0.01 * Value, Value)
-                Else
-                    Return If(Value < 0, 0.01, 1)
-                End If
-            End Function
-
-            Public Shared Function SoftPlus(Value As Double, Optional GD% = 0) As Double
-                If GD = 0 Then
-                    Return Math.Log(1 + Math.Exp(Value))
-                Else
-                    Return 1 / (1 + Math.Abs(Value)) ^ 2
-                End If
-            End Function
-
-            Public Shared Function BentIndentity(Value As Double, Optional GD% = 0) As Double
-                If GD = 0 Then
-                    Return ((Value ^ 2 + 1) ^ 0.5 - 1) / 2 + Value
-                Else
-                    Return Value / (2 * (Value ^ 2 + 1) ^ 0.5) + 1
-                End If
-            End Function
-
-        End Class
-
-        Public NotInheritable Class Loss
-
-            ''' <summary>
-            ''' Loss function: error is calculated as the difference between the actual output and the predicted output
-            ''' </summary>
-
-
-            Public Shared Function Hinge(yHat As List(Of Decimal), y As List(Of Decimal)) As Decimal
-                'Used for classification
-                Dim sum As Decimal
-                For i = 0 To y.Count - 1
-                    sum = Math.Max(0, 1 - yHat(i) * y(i))
-                Next
-                Return sum
-            End Function
-
-            Public Shared Function MAE(yHat As List(Of Decimal), y As List(Of Decimal)) As Decimal
-                'L1 Loss
-                Dim sum As Decimal
-                For i = 0 To y.Count - 1
-                    sum += Math.Abs(yHat(i) - y(i))
-                Next
-                Return sum
-            End Function
-
-            Public Shared Function MSE(yHat As List(Of Decimal), y As List(Of Decimal)) As Decimal
-                'L2 Loss
-                Dim sum As Decimal
-                For i = 0 To y.Count - 1
-                    sum += (yHat(i) - y(i)) * (yHat(i) - y(i))
-                Next
-                Return sum / (2 * y.Count)
-            End Function
-
-        End Class
-
-    End Class
 
     Private Function ActiveF(AFType As String, sum As Double) As Double
         Select Case AFType
@@ -472,10 +392,14 @@ Public Class NeuralNet
     Public Sub PrepareInOut(setInputList As List(Of Double), setTargetList As List(Of Double))
         Dim NoInput% = InputSize
         Dim NoTarget% = OutputSize
+
+        InData.Clear()
         For ii = 0 To setInputList.Count - 1 Step NoInput
             If setInputList.Count Mod NoInput <> 0 Then If ii = setInputList.Count - 1 Then Exit For
             InData.Add(setInputList.GetRange(ii, NoInput))
         Next
+
+        TargetData.Clear()
         For ii = 0 To setTargetList.Count - 1 Step NoTarget
             If setTargetList.Count Mod NoTarget <> 0 Then If ii = setTargetList.Count - 1 Then Exit For
             TargetData.Add(setTargetList.GetRange(ii, NoTarget))
@@ -650,6 +574,9 @@ ErrHandle:
                         End With
                     Next jj
                 Next ii
+
+                test.Append("1")
+
                 'SGD Feedforward and backpropangation update 1 by 1
                 Me.st_Updated_N = Me.st_FF
                 ErrAccumulated += method_MSE()
@@ -661,7 +588,7 @@ ErrHandle:
             ElapsedTime += GetTime()
             ThreadSafe = True
 
-            Console.WriteLine("Finished batch " & T)
+            'Console.WriteLine("Finished batch " & T)
         Next T
 
         st_Train = False
@@ -850,7 +777,183 @@ ErrHandle:
 
 End Class
 
-
+'**************************************************************************************************************************************************************
+'//Test new neural network with array (DArray Class)
+'**************************************************************************************************************************************************************
 Public Class NN_Array
+    Private Shared stored_ID%
+
+    Public ID%
+
+    Public Layers As List(Of DArray)
+
+    '2 set of input data and target data using in each loop
+    Public InData As List(Of List(Of Double))
+    Public TargetData As List(Of List(Of Double))
+
+    Public Active As Boolean
+
+    Public Delegate Function AF(v As Double) As Double
+    Public ActivationFunction As AF
+
+    Public ReadOnly Property InputSize As Integer = Layers(0).Columns
+    Public ReadOnly Property OutputSize As Integer = Layers(Layers.Count - 1).Columns
+
+    Public Sub New()
+        ID = stored_ID
+        stored_ID += 1
+    End Sub
+    Public Shared Function count() As Integer
+        Return stored_ID
+    End Function
+
+    Public Function Build_NeuralNet(Genetic As String) As Boolean
+        Dim strNetwork$
+        If Not Active Then
+            With Me
+                For ii = 0 To UBound(Split(Genetic, "="))
+                    strNetwork = Split(Genetic, "=")(ii)
+                    If InStr(1, strNetwork, ".") > 0 Then
+                        For jj = 0 To UBound(Split(strNetwork, "+"))
+                            .AddLayer(CInt(Split(Split(strNetwork, "+")(jj), ".")(0)), If(jj = 0, 1, CInt(Split(Split(strNetwork, "+")(jj - 1), ".")(0))))
+                        Next
+                    Else
+                        .AddLayer(CInt(strNetwork))
+                    End If
+                Next
+            End With
+            Active = True
+            Build_NeuralNet = True
+        Else
+            Build_NeuralNet = False
+        End If
+    End Function
+    Public Sub AddLayer(NoNeuron%, Optional lastLayersNeuron% = 1)
+        If Me.Active = True Then Exit Sub
+        Dim L As New DArray(lastLayersNeuron, NoNeuron)
+        L.Fill(-0.01, 0.01)
+        Layers.Add(L)
+    End Sub
+
+#Region "Method to Set Input/Target Network"
+    '//input with setinput, output with result
+    Public Function SetInput(InArray As List(Of Double)) As Boolean
+        If InArray.Count > Layers.Item(0).Columns Then _
+    MsgBox("Input array's Size: " & InArray.Count & " does not match with network: " & Layers.Item(0).Columns) : SetInput = False : Exit Function
+
+        Dim t As New DArray(InArray)
+        Layers(0) = t
+        SetInput = True
+    End Function
+
+    Public Sub PrepareInOut(setInputList As List(Of Double), setTargetList As List(Of Double))
+        Dim NoInput% = InputSize
+        Dim NoTarget% = OutputSize
+
+        InData.Clear()
+        For ii = 0 To setInputList.Count - 1 Step NoInput
+            If setInputList.Count Mod NoInput <> 0 Then If ii = setInputList.Count - 1 Then Exit For
+            InData.Add(setInputList.GetRange(ii, NoInput))
+        Next
+
+        TargetData.Clear()
+        For ii = 0 To setTargetList.Count - 1 Step NoTarget
+            If setTargetList.Count Mod NoTarget <> 0 Then If ii = setTargetList.Count - 1 Then Exit For
+            TargetData.Add(setTargetList.GetRange(ii, NoTarget))
+        Next
+    End Sub
+#End Region
+
+    Public Sub Calculate()
+        Dim t As DArray
+        t = Layers(0).Multiply(Layers(1))
+        For i = 1 To Layers.Count - 2
+            t = t.Multiply(Layers(i + 1))
+            t.ApplyFunc(Function(x) ActivationFunction.Invoke(x))
+        Next
+        Layers(Layers.Count - 1) = t
+    End Sub
+
+End Class
+
+
+
+Public NotInheritable Class FunctionList
+
+    ''' <summary>
+    ''' list of Default function support for Activation and Loss
+    ''' </summary>
+
+    Public NotInheritable Class Activation
+
+        Public Shared Function Sigmoid(Value As Double, Optional GD% = 0) As Double
+            If GD = 0 Then
+                Return 1 / (1 + Math.Exp(-Value))
+            Else
+                Return Sigmoid(Value) * (1 - Sigmoid(Value))
+            End If
+        End Function
+
+        Public Shared Function LeakyRELU(Value As Double, Optional GD% = 0) As Double
+            If GD = 0 Then
+                Return If(Value < 0, 0.01 * Value, Value)
+            Else
+                Return If(Value < 0, 0.01, 1)
+            End If
+        End Function
+
+        Public Shared Function SoftPlus(Value As Double, Optional GD% = 0) As Double
+            If GD = 0 Then
+                Return Math.Log(1 + Math.Exp(Value))
+            Else
+                Return 1 / (1 + Math.Abs(Value)) ^ 2
+            End If
+        End Function
+
+        Public Shared Function BentIndentity(Value As Double, Optional GD% = 0) As Double
+            If GD = 0 Then
+                Return ((Value ^ 2 + 1) ^ 0.5 - 1) / 2 + Value
+            Else
+                Return Value / (2 * (Value ^ 2 + 1) ^ 0.5) + 1
+            End If
+        End Function
+
+    End Class
+
+    Public NotInheritable Class Loss
+
+        ''' <summary>
+        ''' Loss function: error is calculated as the difference between the actual output and the predicted output
+        ''' </summary>
+
+
+        Public Shared Function Hinge(yHat As List(Of Decimal), y As List(Of Decimal)) As Decimal
+            'Used for classification
+            Dim sum As Decimal
+            For i = 0 To y.Count - 1
+                sum = Math.Max(0, 1 - yHat(i) * y(i))
+            Next
+            Return sum
+        End Function
+
+        Public Shared Function MAE(yHat As List(Of Decimal), y As List(Of Decimal)) As Decimal
+            'L1 Loss
+            Dim sum As Decimal
+            For i = 0 To y.Count - 1
+                sum += Math.Abs(yHat(i) - y(i))
+            Next
+            Return sum
+        End Function
+
+        Public Shared Function MSE(yHat As List(Of Decimal), y As List(Of Decimal)) As Decimal
+            'L2 Loss
+            Dim sum As Decimal
+            For i = 0 To y.Count - 1
+                sum += (yHat(i) - y(i)) * (yHat(i) - y(i))
+            Next
+            Return sum / (2 * y.Count)
+        End Function
+
+    End Class
 
 End Class
