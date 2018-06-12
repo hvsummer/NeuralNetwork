@@ -11,31 +11,32 @@ Public Class LiteDb
     Public status As Byte
     Public lastAffect&
 
-    Public ReadOnly Property FullPath()
+    Public ReadOnly Property FullPath() As String
         Get
             Return IO.Path.Combine(Path, DbName)
         End Get
     End Property
 
-    Public ReadOnly Property Tables
+    Public ReadOnly Property Tables As List(Of String)
         Get
             If status < 2 Then Return New List(Of String)
             Dim Res = Conn.GetSchema(SQLiteMetaDataCollectionNames.Tables)
-            Tables = New List(Of String)
+            Dim T As New List(Of String)
             For ii% = 0 To Res.Rows.Count - 1
                 If Res.Rows(ii)!table_type.ToString = "table" Then
-                    Tables.Add(Res.Rows(ii)!table_name.ToString)
+                    T.Add(Res.Rows(ii)!table_name.ToString)
                 End If
             Next
+            Return t
         End Get
     End Property
-    Public ReadOnly Property DataBase_Name
+    Public ReadOnly Property DataBase_Name As String
         Get
             Return DbName
         End Get
     End Property
 
-    Public Function Execute(strSQL$) As Integer
+    Public Function Execute(strSQL$) As Long
         If status < 2 Then Return -1
         Using cmd = New SQLiteCommand(strSQL, Conn)
             lastAffect = cmd.ExecuteNonQuery()
@@ -63,8 +64,8 @@ Public Class LiteDb
                 While Reader.Read()
                     Dim row As New List(Of String)
                     With row
-                        For ii& = 0 To Reader.FieldCount - 1
-                            row.Add(Reader.GetValue(ii))
+                        For ii% = 0 To Reader.FieldCount - 1
+                            row.Add(Reader.GetValue(ii).ToString)
                         Next
                     End With
                     Data.Add(row.ToStr(vbTab))
@@ -78,11 +79,11 @@ Public Class LiteDb
     End Function
 
     '// Custom function of this Wrapper Class
-    Public Function LoadCSV(Path$, TblName$, Optional MaxColumn& = -1)
+    Public Function LoadCSV(Path$, TblName$, Optional MaxColumn& = -1) As DataTable
         'FileName=Path OR data=TEXT
         'schema=SCHEMA (Example: CREATE TABLE TblName (Field1, Field2) ) OR columns=N
         Dim strSQL$ = "CREATE VIRTUAL TABLE temp.{0} USING csv(filename={1})"
-        strSQL = String.Format(strSQL, TblName, Path & IIf(MaxColumn > 0, ",Columns=" & MaxColumn, ""))
+        strSQL = String.Format(strSQL, TblName, Path & If(MaxColumn > 0, ",Columns={0}" & MaxColumn, ""))
         lastAffect = Execute(strSQL)
         Return Query("SELECT * FROM " & TblName)
     End Function
@@ -103,7 +104,7 @@ Public Class LiteDb
 
     '//Image to Blob and vise versa
     'Image BLOB Functions
-    Private Function BlobToImage(ByVal blob)
+    Private Function BlobToImage(ByVal blob As Object) As Bitmap
         Using mStream As New System.IO.MemoryStream
             Dim pData() As Byte = DirectCast(blob, Byte())
             mStream.Write(pData, 0, Convert.ToInt32(pData.Length))
@@ -112,10 +113,10 @@ Public Class LiteDb
         End Using
     End Function
 
-    Public Overloads Function ImageToBlob(ByVal id As String, ByVal filePath As String)
+    Public Overloads Function ImageToBlob(ByVal id As String, ByVal filePath As String) As SQLiteParameter
         Dim fs As FileStream = New FileStream(filePath, FileMode.Open, FileAccess.Read)
         Dim br As BinaryReader = New BinaryReader(fs)
-        Dim bm() As Byte = br.ReadBytes(fs.Length)
+        Dim bm() As Byte = br.ReadBytes(CInt(fs.Length))
         br.Close()
         fs.Close()
         'Create Parm
@@ -125,7 +126,7 @@ Public Class LiteDb
         SQLparm.Value = photo
         Return SQLparm
     End Function
-    Public Overloads Function ImageToBlob(ByVal id As String, ByVal image As Image)
+    Public Overloads Function ImageToBlob(ByVal id As String, ByVal image As Image) As SQLiteParameter
         Dim ms As New MemoryStream()
         image.Save(ms, System.Drawing.Imaging.ImageFormat.Png)
         'Create Parm
@@ -138,7 +139,7 @@ Public Class LiteDb
 
 
     '//prepare db if not exist
-    Public Function CreateDB()
+    Public Function CreateDB() As Boolean
         If Not File.Exists(FullPath) Then
             Try
                 SQLiteConnection.CreateFile(DbName)

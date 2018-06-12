@@ -5,9 +5,9 @@ Public Class DArray
 
     Private Val() As Double
     Private iCol() As Integer
-    Public Rows&
-    Public Columns&
-    Public Sub New(x&, y&)
+    Public Rows%
+    Public Columns%
+    Public Sub New(x%, y%)
         Val = New Double(x * y - 1) {}
         iCol = New Integer(y - 1) {}
         For i = 0 To y - 1
@@ -25,7 +25,7 @@ Public Class DArray
         Columns = Arr.Columns
     End Sub
 
-    Default Public Property Items(RowIndex&, ColIndex&) As Double
+    Default Public Property Items(RowIndex%, ColIndex%) As Double
         Get
             Return Val(iCol(ColIndex) + RowIndex)
         End Get
@@ -34,7 +34,7 @@ Public Class DArray
         End Set
     End Property
 
-    Public Property index(RowIndex&) As Double
+    Public Property index(RowIndex%) As Double
         Get
             Return Val(RowIndex)
         End Get
@@ -52,8 +52,8 @@ Public Class DArray
                     Result.index(i) = Val(i)
                 Next
             Case Else
-                Dim NewRow& = Columns
-                Dim NewCol& = Rows
+                Dim NewRow% = Columns
+                Dim NewCol% = Rows
                 For j = 0 To NewCol
                     For i = 0 To NewRow
                         Result.index(j * NewRow + i) = Val(i * NewCol + j)
@@ -65,7 +65,7 @@ Public Class DArray
 
 
     '//Operators
-    Public Shared Operator *(obj1 As DArray, obj2 As DArray)
+    Public Shared Operator *(obj1 As DArray, obj2 As DArray) As DArray
         If obj1 Is Nothing Or obj2 Is Nothing Then Throw New NullReferenceException("Dense Array is not valid, Null Ref Exception.")
         If obj1.Rows <> obj2.Rows Or obj1.Columns <> obj2.Columns Then Throw New Exception("Rows or column of Dense Array is not matched")
         Dim Result As New DArray(obj1.Rows, obj1.Columns)
@@ -74,7 +74,7 @@ Public Class DArray
         Next
         Return Result
     End Operator
-    Public Shared Operator *(obj1 As DArray, obj2 As Double)
+    Public Shared Operator *(obj1 As DArray, obj2 As Double) As DArray
         If obj1 Is Nothing Then Throw New NullReferenceException("Dense Array is not valid, Null Ref Exception.")
         Dim Result As New DArray(obj1.Rows, obj1.Columns)
         For i = 0 To obj1.Val.Length - 1
@@ -83,7 +83,7 @@ Public Class DArray
         Return Result
     End Operator
 
-    Public Shared Operator /(obj1 As DArray, obj2 As DArray)
+    Public Shared Operator /(obj1 As DArray, obj2 As DArray) As DArray
         If obj1 Is Nothing Or obj2 Is Nothing Then Throw New NullReferenceException("Dense Array is not valid, Null Ref Exception.")
         If obj1.Rows <> obj2.Rows Or obj1.Columns <> obj2.Columns Then Throw New Exception("Rows or column of Dense Array is not matched")
         Dim Result As New DArray(obj1.Rows, obj1.Columns)
@@ -92,7 +92,7 @@ Public Class DArray
         Next
         Return Result
     End Operator
-    Public Shared Operator /(obj1 As DArray, obj2 As Double)
+    Public Shared Operator /(obj1 As DArray, obj2 As Double) As DArray
         If obj1 Is Nothing Then Throw New NullReferenceException("Dense Array is not valid, Null Ref Exception.")
         Dim Result As New DArray(obj1.Rows, obj1.Columns)
         For i = 0 To obj1.Val.Length - 1
@@ -101,7 +101,7 @@ Public Class DArray
         Return Result
     End Operator
 
-    Public Shared Operator +(obj1 As DArray, obj2 As DArray)
+    Public Shared Operator +(obj1 As DArray, obj2 As DArray) As DArray
         If obj1 Is Nothing Or obj2 Is Nothing Then Throw New NullReferenceException("Dense Array is not valid, Null Ref Exception.")
         If obj1.Rows <> obj2.Rows Or obj1.Columns <> obj2.Columns Then Throw New Exception("Rows or column of Dense Array is not matched")
         Dim Result As New DArray(obj1.Rows, obj1.Columns)
@@ -110,7 +110,7 @@ Public Class DArray
         Next
         Return Result
     End Operator
-    Public Shared Operator +(obj1 As DArray, obj2 As Double)
+    Public Shared Operator +(obj1 As DArray, obj2 As Double) As DArray
         If obj1 Is Nothing Then Throw New NullReferenceException("Dense Array is not valid, Null Ref Exception.")
         Dim Result As New DArray(obj1.Rows, obj1.Columns)
         For i = 0 To obj1.Val.Length - 1
@@ -119,7 +119,7 @@ Public Class DArray
         Return Result
     End Operator
 
-    Public Shared Operator -(obj1 As DArray, obj2 As DArray)
+    Public Shared Operator -(obj1 As DArray, obj2 As DArray) As DArray
         If obj1 Is Nothing Or obj2 Is Nothing Then Throw New NullReferenceException("Dense Array is not valid, Null Ref Exception.")
         If obj1.Rows <> obj2.Rows Or obj1.Columns <> obj2.Columns Then Throw New Exception("Rows or column of Dense Array is not matched")
         Dim Result As New DArray(obj1.Rows, obj1.Columns)
@@ -128,7 +128,7 @@ Public Class DArray
         Next
         Return Result
     End Operator
-    Public Shared Operator -(obj1 As DArray, obj2 As Double)
+    Public Shared Operator -(obj1 As DArray, obj2 As Double) As DArray
         If obj1 Is Nothing Then Throw New NullReferenceException("Dense Array is not valid, Null Ref Exception.")
         Dim Result As New DArray(obj1.Rows, obj1.Columns)
         For i = 0 To obj1.Val.Length - 1

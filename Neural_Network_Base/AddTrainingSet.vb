@@ -3,7 +3,7 @@ Imports System.Text.RegularExpressions
 
 
 Public Class AddTrainingSet
-    Private xlApp As Object
+    Private xlApp As Excel.Application
     Public DB As LiteDb
     Public curSetting$
     Private Declare Function SetForegroundWindow Lib "user32" (ByVal hwnd As Integer) As IntPtr
@@ -15,7 +15,7 @@ Public Class AddTrainingSet
 
         ' Add any initialization after the InitializeComponent() call.
         Try
-            xlApp = GetObject(, "Excel.Application")
+            xlApp = CType(GetObject(, "Excel.Application"), Excel.Application)
         Catch e As Exception
             Console.WriteLine("Error can't get Excell app, Err:" & e.Message)
         End Try
@@ -31,7 +31,7 @@ Public Class AddTrainingSet
         SetForegroundWindow(xlApp.Hwnd)
     End Sub
     Public Sub ShowMe()
-        SetForegroundWindow(Me.Handle)
+        SetForegroundWindow(CInt(Handle))
     End Sub
 
     Private Sub bOk_Click(sender As Object, e As EventArgs) Handles bOk.Click
@@ -55,24 +55,24 @@ Public Class AddTrainingSet
     End Sub
     Private Sub tbTargetRange_Click(sender As Object, e As EventArgs) Handles tbTargetRange.Click
         Dim rng As Excel.Range
-        Dim Arr
+        Dim Arr As VariantType(,)
 
         On Error Resume Next
         If Not xlApp Is Nothing Then
             Me.Hide()
 ReSelect:
             ShowExcel()
-            rng = xlApp.InputBox("Select Input Range", "Range", "", , , , , 8)
+            rng = TryCast(xlApp.InputBox("Select Input Range", "Range", "", , , , , 8), Excel.Range)
             On Error GoTo 0
 
             If Not rng Is Nothing Then
                 If rng.Columns.Count > 1 And rng.Rows.Count > 1 Then MsgBox("You can only select 1 row or 1 column !!") : GoTo ReSelect
-                Arr = rng.Value2
-                If Arr.rank = 0 Then
-                    tbTargetRange.Text = "1=(" & Arr & ")"
+                Arr = CType(rng.Value2, VariantType(,))
+                If Arr.Rank = 0 Then
+                    tbTargetRange.Text = "1=(" & Arr.ToString & ")"
                 Else
-                    Arr = Trans1D(Arr)
-                    tbTargetRange.Text = UBound(Arr) + 1 & "=(" & Join(Arr, "|") & ")"
+                    Arr = CType(Trans1D(Arr), VariantType(,))
+                    tbTargetRange.Text = UBound(Arr) + 1 & "=(" & Arr.ToStr("|") & ")"
                 End If
                 rng = Nothing
             End If
@@ -82,24 +82,24 @@ ReSelect:
     End Sub
     Private Sub tbInputRange_Click(sender As Object, e As EventArgs) Handles tbInputRange.Click
         Dim rng As Excel.Range
-        Dim Arr
+        Dim Arr As VariantType(,)
 
         On Error Resume Next
         If Not xlApp Is Nothing Then
             Me.Hide()
 ReSelect:
             ShowExcel()
-            rng = xlApp.InputBox("Select Input Range", "Range", "", , , , , 8)
+            rng = CType(xlApp.InputBox("Select Input Range", "Range", "", , , , , 8), Excel.Range)
             On Error GoTo 0
 
             If Not rng Is Nothing Then
                 If rng.Columns.Count > 1 And rng.Rows.Count > 1 Then MsgBox("You can only select 1 row or 1 column !!") : GoTo ReSelect
-                Arr = rng.Value2
+                Arr = CType(rng.Value2, VariantType(,))
                 If Arr.rank = 0 Then
-                    tbInputRange.Text = "1=(" & Arr & ")"
+                    tbInputRange.Text = "1=(" & Arr.ToString & ")"
                 Else
-                    Arr = Trans1D(Arr)
-                    tbInputRange.Text = UBound(Arr) + 1 & "=(" & Join(Arr, "|") & ")"
+                    Arr = CType(Trans1D(Arr), VariantType(,))
+                    tbInputRange.Text = UBound(Arr) + 1 & "=(" & Arr.ToStr("|") & ")"
                 End If
                 rng = Nothing
             End If

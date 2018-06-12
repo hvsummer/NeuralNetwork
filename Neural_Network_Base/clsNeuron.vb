@@ -18,15 +18,15 @@
         Weights = New List(Of Double)
     End Sub
 
-    Public ReadOnly Property Info()
+    Public ReadOnly Property Info() As String
         Get
             Dim Builder As New Text.StringBuilder
             'Neuron information will have 2 part
             '1 general information: type, Id
             '2 It''s value
             Builder.Append(IDGlobal).Append("-").Append(ActivationFunction).Append(vbTab)
-            Builder.Append("Bias=").Append(Math.Round(Bias, 6)).Append(IIf(Len(Bias) > 6, "...", "")).Append(StrDup(Math.Max(0, 8 - Len(Math.Round(Bias, 6))), " "c)).Append(vbTab)
-            Builder.Append("Delta=").Append(Math.Round(Delta, 6)).Append(IIf(Len(Delta) > 6, "...", "")).Append(StrDup(Math.Max(0, 8 - Len(Math.Round(Delta, 6))), " "c)).Append(vbTab)
+            Builder.Append("Bias=").Append(Math.Round(Bias, 6)).Append(If(Len(Bias) > 6, "...", "")).Append(StrDup(Math.Max(0, 8 - Len(Math.Round(Bias, 6))), " "c)).Append(vbTab)
+            Builder.Append("Delta=").Append(Math.Round(Delta, 6)).Append(If(Len(Delta) > 6, "...", "")).Append(StrDup(Math.Max(0, 8 - Len(Math.Round(Delta, 6))), " "c)).Append(vbTab)
             Builder.Append("Output=").Append(Math.Round(Value, 6)).Append(vbTab)
             If Split(IDGlobal, "-")(0) = "1" Then
                 Builder.Append("Weights=").Append("Null")
@@ -41,26 +41,26 @@
             Dim Res As List(Of String)
             Res = New List(Of String)
             With Res
-                .Add(ID)
+                .Add(CStr(ID))
                 .Add(IDGlobal)
                 .Add(Me.ActivationFunction)
-                .Add(Me.Bias)
-                .Add(Me.Delta)
-                .Add(Me.AccDelta)
-                .Add(Value)
+                .Add(CStr(Me.Bias))
+                .Add(CStr(Me.Delta))
+                .Add(CStr(Me.AccDelta))
+                .Add(CStr(Value))
                 .Add(Weights.ToStr("|"))
             End With
             DNA = Res
         End Get
         Set(gen As List(Of String))
             With Me
-                .ID = gen(0)
+                .ID = CInt(gen(0))
                 .IDGlobal = gen(1)
                 .ActivationFunction = gen(2)
-                .Bias = gen(3)
-                .Delta = gen(4)
-                .AccDelta = gen(5)
-                Value = gen(6)
+                .Bias = CDbl(gen(3))
+                .Delta = CDbl(gen(4))
+                .AccDelta = CDbl(gen(5))
+                Value = CDbl(gen(6))
                 Weights.ImportFromArray(Split(gen(7), "|"))
             End With
         End Set

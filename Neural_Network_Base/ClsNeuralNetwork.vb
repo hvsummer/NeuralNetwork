@@ -4,11 +4,11 @@
 'Imports Neural_Network_Base
 
 Public Structure Status
-    Public st_FF&
-    Public st_Updated_N&
+    Public st_FF%
+    Public st_Updated_N%
     Public st_Input$
-    Public st_CurrEpoch&
-    Public CurrentIndex&
+    Public st_CurrEpoch%
+    Public CurrentIndex%
 End Structure
 
 
@@ -24,24 +24,23 @@ Public Class NeuralNet
     Public globalError#
     Private errList As List(Of Double)
     Public Active As Boolean
+    Private minibatchsize%
 
-
-    Dim str As New Text.StringBuilder
     'Status
-    Public st_FF&
-    Public st_Updated_N&
+    Public st_FF%
+    Public st_Updated_N%
     Public st_Input$
-    Public st_CurrEpoch&
-    Public CurrentIndex&
+    Public st_CurrEpoch%
+    Public CurrentIndex%
     Public st_Train As Boolean
 
-    Private MaxEpoch&
+    Private MaxEpoch%
     Public Trained_Total_Epoch%
     Public Trained_Time%
 
     Public ElapsedTime#
 
-    Private Train_Thread As Threading.Thread
+    Public ThreadSafe As Boolean
 
     '2 set of input data and target data using in each loop
     Public InData As List(Of List(Of Double))
@@ -51,7 +50,7 @@ Public Class NeuralNet
 #Region "Delegate"
 
     Public Delegate Sub DelegateTrain(Layers As List(Of layer), InData As List(Of List(Of Double)), TargetData As List(Of List(Of Double)), stt As Status, AF As ActivationFunc)
-    Public Delegate Function ActivationFunc(X As Decimal) As Decimal
+    Public Delegate Function ActivationFunc(X As Double) As Double
 
 
 #End Region
@@ -67,11 +66,9 @@ Public Class NeuralNet
         InData = New List(Of List(Of Double))
         TargetData = New List(Of List(Of Double))
         errList = New List(Of Double)
+        ThreadSafe = False
     End Sub
     Protected Overrides Sub Finalize()
-        On Error Resume Next
-        Train_Thread.Abort()
-        On Error GoTo 0
         Layers.Clear()
         Layers = Nothing
         InData = Nothing
@@ -104,7 +101,7 @@ Public Class NeuralNet
     Public ReadOnly Property Process() As String
         Get
             Dim strB As New Text.StringBuilder
-            ElapsedTime += Perf_Lap()
+            ElapsedTime += GetTime()
             strB.Append("Status: FF(").Append(st_FF).Append(" - ").Append(Math.Round(st_FF / ElapsedTime, 2))
             strB.Append(") Updated(").Append(st_Updated_N).Append(" - ").Append(Math.Round(st_Updated_N / ElapsedTime, 2))
             strB.Append(") Epoch(").Append(st_CurrEpoch).Append("/").Append(MaxEpoch).Append(" - ").Append(Math.Round(st_CurrEpoch / MaxEpoch * 100, 2))
@@ -114,12 +111,12 @@ Public Class NeuralNet
         End Get
     End Property
 
-    Public ReadOnly Property InputSize() As Long
+    Public ReadOnly Property InputSize() As Integer
         Get
             Return Layers(0).Neurons.Count
         End Get
     End Property
-    Public ReadOnly Property OutputSize() As Long
+    Public ReadOnly Property OutputSize() As Integer
         Get
             Return Layers(Layers.Count - 1).Neurons.Count
         End Get
@@ -139,9 +136,8 @@ Public Class NeuralNet
         End Set
     End Property
 
-    Public ReadOnly Property Network_Information()
+    Public ReadOnly Property Network_Information() As String
         Get
-            Dim ii&, jj&
             Dim Str As New Text.StringBuilder
             For ii = 0 To Me.Layers.Count - 1
                 For jj = 0 To Me.Layers.Item(ii).Neurons.Count - 1
@@ -156,9 +152,8 @@ Public Class NeuralNet
         End Get
     End Property
 
-    Public ReadOnly Property Network_Structure()
+    Public ReadOnly Property Network_Structure() As String
         Get
-            Dim ii&
             Dim str As New Text.StringBuilder
 
             For ii = 1 To Me.Layers.Count - 2
@@ -180,9 +175,9 @@ Public Class NeuralNet
             'Output
             For ii = 0 To OutputSize - 1
                 If ii > 0 Then
-                    R = R & Deli & Math.Round(Layers(Layers.Count - 1).Neurons(ii).Value, 8)
+                    R &= Deli & Math.Round(Layers(Layers.Count - 1).Neurons(ii).Value, 8)
                 Else
-                    R = Math.Round(Layers(Layers.Count - 1).Neurons(ii).Value, 8)
+                    R = Math.Round(Layers(Layers.Count - 1).Neurons(ii).Value, 8).ToString
                 End If
             Next
             Return R
@@ -202,7 +197,7 @@ Public Class NeuralNet
     End Property
     Public ReadOnly Property Current_MSError(Optional Deli$ = vbCrLf) As String
         Get
-            Return method_MSE()
+            Return method_MSE().ToString
         End Get
     End Property
     Public ReadOnly Property MSError(Optional Deli$ = vbCrLf) As String
@@ -214,7 +209,7 @@ Public Class NeuralNet
                 Calculate()
                 s.Append(method_MSE()).Append(Deli)
             Next
-            SetInput(InData(CurrentIndex))
+            'SetInput(InData(CurrentIndex))
             Return s.ToString
         End Get
     End Property
@@ -237,7 +232,6 @@ Public Class NeuralNet
 
 #Region "Save and Load Network"
     Public Sub Save_NeuralNet(Name$, Path$)
-        Dim ii&, jj&
         Dim Str As List(Of String) : Str = New List(Of String)
         With Str
             .Add(NetName)
@@ -260,9 +254,8 @@ Public Class NeuralNet
     End Sub
     Public Sub Load_NeuralNet()
 
-        Dim ii&, jj&
         Dim Str As List(Of String) : Str = New List(Of String)
-        Dim c& = 0
+        Dim c% = 0
         Str = ReadFile(Getfile(False, "Select text file content Neural Net structure"))
 
         With Me
@@ -286,17 +279,17 @@ Public Class NeuralNet
 #Region "Method Build Network"
     '// 2 method to build up network
     Public Function Build_NeuralNet(Genetic As String) As Boolean
-        Dim strNetwork$, ii&, jj&
+        Dim strNetwork$
         If Not Active Then
             With Me
                 For ii = 0 To UBound(Split(Genetic, "="))
                     strNetwork = Split(Genetic, "=")(ii)
                     If InStr(1, strNetwork, ".") > 0 Then
                         For jj = 0 To UBound(Split(strNetwork, "+"))
-                            .AddLayer(CDbl(Split(Split(strNetwork, "+")(jj), ".")(0)), CStr(Split(Split(strNetwork, "+")(jj), ".")(1)))
+                            .AddLayer(CInt(Split(Split(strNetwork, "+")(jj), ".")(0)), Split(Split(strNetwork, "+")(jj), ".")(1))
                         Next
                     Else
-                        .AddLayer(CDbl(strNetwork))
+                        .AddLayer(CInt(strNetwork))
                     End If
                 Next
             End With
@@ -307,11 +300,11 @@ Public Class NeuralNet
         End If
     End Function
 
-    Public Sub AddLayer(NoNeuron&, Optional AF$ = "Leaky_RELU")
+    Public Sub AddLayer(NoNeuron%, Optional AF$ = "Leaky_RELU")
         If Me.Active = True Then Exit Sub
         Dim L As layer = New layer
         With L
-            .ActivationFunction = IIf(Layers.Count = 0, "", AF)
+            .ActivationFunction = If(Layers.Count = 0, "", AF)
             .ID = Layers.Count + 1
             If Layers.Count = 0 Then
                 .Create(NoNeuron, 0, "")
@@ -325,7 +318,7 @@ Public Class NeuralNet
 #End Region
 
 
-    Public Sub Train_Flexible(Epoch&, FuncTrainAlgothym As DelegateTrain, Optional AF As ActivationFunc = Nothing)
+    Public Sub Train_Flexible(Epoch%, FuncTrainAlgothym As DelegateTrain, Optional AF As ActivationFunc = Nothing)
 
         If InData Is Nothing And TargetData Is Nothing Then MsgBox("Please feed data into network with PrepareInOut Method before train",, "Warning") : Exit Sub
 
@@ -349,7 +342,7 @@ Public Class NeuralNet
 
         Public NotInheritable Class Activation
 
-            Public Shared Function Sigmoid(Value As Decimal, Optional GD% = 0)
+            Public Shared Function Sigmoid(Value As Double, Optional GD% = 0) As Double
                 If GD = 0 Then
                     Return 1 / (1 + Math.Exp(-Value))
                 Else
@@ -357,15 +350,15 @@ Public Class NeuralNet
                 End If
             End Function
 
-            Public Shared Function LeakyRELU(Value As Decimal, Optional GD% = 0)
+            Public Shared Function LeakyRELU(Value As Double, Optional GD% = 0) As Double
                 If GD = 0 Then
-                    Return IIf(Value < 0, 0.01 * Value, Value)
+                    Return If(Value < 0, 0.01 * Value, Value)
                 Else
-                    Return IIf(Value < 0, 0.01, 1)
+                    Return If(Value < 0, 0.01, 1)
                 End If
             End Function
 
-            Public Shared Function SoftPlus(Value As Decimal, Optional GD% = 0)
+            Public Shared Function SoftPlus(Value As Double, Optional GD% = 0) As Double
                 If GD = 0 Then
                     Return Math.Log(1 + Math.Exp(Value))
                 Else
@@ -373,7 +366,7 @@ Public Class NeuralNet
                 End If
             End Function
 
-            Public Shared Function BentIndentity(Value As Decimal, Optional GD% = 0)
+            Public Shared Function BentIndentity(Value As Double, Optional GD% = 0) As Double
                 If GD = 0 Then
                     Return ((Value ^ 2 + 1) ^ 0.5 - 1) / 2 + Value
                 Else
@@ -412,7 +405,7 @@ Public Class NeuralNet
                 'L2 Loss
                 Dim sum As Decimal
                 For i = 0 To y.Count - 1
-                    sum += (yHat(i) - y(i)) ^ 2
+                    sum += (yHat(i) - y(i)) * (yHat(i) - y(i))
                 Next
                 Return sum / (2 * y.Count)
             End Function
@@ -426,7 +419,7 @@ Public Class NeuralNet
             Case "Sigmoid"
                 ActiveF = 1 / (1 + Math.Exp(-sum))
             Case "Leaky_RELU"
-                ActiveF = IIf(sum < 0, 0.01 * sum, sum)
+                ActiveF = If(sum < 0, 0.01 * sum, sum)
             Case "Soft_Plus"
                 ActiveF = Math.Log(1 + Math.Exp(sum))
             Case "Bent_Identity"
@@ -441,7 +434,7 @@ Public Class NeuralNet
             Case "Sigmoid"
                 ErrorS = ActiveF(AFType, sum) * (1 - ActiveF(AFType, sum))
             Case "Leaky_RELU"
-                ErrorS = IIf(sum < 0, 0.01, 1)
+                ErrorS = If(sum < 0, 0.01, 1)
             Case "Soft_Plus"
                 ErrorS = 1 / (1 + Math.Abs(sum)) ^ 2
             Case "Bent_Identity"
@@ -450,7 +443,7 @@ Public Class NeuralNet
         Return ErrorS
     End Function
 
-    Public Function method_MSE(Optional m& = -1) As Double
+    Public Function method_MSE(Optional m% = -1) As Double
         'Calculate Error RSM
         Dim ErrorSignal As Double = 0
         If m = -1 Then m = CurrentIndex
@@ -465,8 +458,7 @@ Public Class NeuralNet
 
 #Region "Method to Set Input/Target Network"
     '//input with setinput, output with result
-    Public Function SetInput(InArray As List(Of Double))
-        Dim ii&
+    Public Function SetInput(InArray As List(Of Double)) As Boolean
         If InArray.Count > Layers.Item(0).Neurons.Count Then _
     MsgBox("Input array's Size: " & InArray.Count & " does not match with network: " & Layers.Item(0).Neurons.Count) : SetInput = False : Exit Function
 
@@ -478,8 +470,8 @@ Public Class NeuralNet
     End Function
 
     Public Sub PrepareInOut(setInputList As List(Of Double), setTargetList As List(Of Double))
-        Dim NoInput& = InputSize
-        Dim NoTarget& = OutputSize
+        Dim NoInput% = InputSize
+        Dim NoTarget% = OutputSize
         For ii = 0 To setInputList.Count - 1 Step NoInput
             If setInputList.Count Mod NoInput <> 0 Then If ii = setInputList.Count - 1 Then Exit For
             InData.Add(setInputList.GetRange(ii, NoInput))
@@ -492,13 +484,13 @@ Public Class NeuralNet
 #End Region
 
     '//Execute input with calculate
-    Public Overloads Function Calculate()
+    Public Overloads Function Calculate() As Boolean
         Dim sum#
         Try
             For ii = 1 To Layers.Count - 1
                 For jj = 0 To Layers.Item(ii).Neurons.Count - 1
                     With Layers.Item(ii).Neurons.Item(jj)
-                        'Perf_Lap()
+                        'GetTime()
                         sum = 0
                         For k = 0 To Layers.Item(ii - 1).Neurons.Count - 1
                             sum = sum + Layers.Item(ii - 1).Neurons.Item(k).Value * .Weights.Item(k)
@@ -509,19 +501,19 @@ Public Class NeuralNet
             Next
             Return True
         Catch e As Exception
-            Debug.Print(" Error while calculate network!! " & vbTab & Err.Description & vbCrLf & e.Message)
+            Console.WriteLine(" Error while calculate network!! " & vbTab & Err.Description & vbCrLf & e.Message)
             Return False
         End Try
 
     End Function
-    Public Overloads Function Calculate(AF As ActivationFunc)
+    Public Overloads Function Calculate(AF As ActivationFunc) As Boolean
         Dim sum#
         On Error GoTo ErrHandle
         Calculate = False
         For ii = 1 To Layers.Count - 1
             For jj = 0 To Layers.Item(ii).Neurons.Count - 1
                 With Layers.Item(ii).Neurons.Item(jj)
-                    'Perf_Lap()
+                    'GetTime()
                     sum = 0
                     For k = 0 To Layers.Item(ii - 1).Neurons.Count - 1
                         sum = sum + Layers.Item(ii - 1).Neurons.Item(k).Value * .Weights.Item(k)
@@ -533,24 +525,17 @@ Public Class NeuralNet
         Calculate = True
         Exit Function
 ErrHandle:
-        Debug.Print(" Error while calculate network!! " & vbTab & Err.Description)
+        Console.WriteLine(" Error while calculate network!! " & vbTab & Err.Description)
     End Function
 
 #Region "Default Method Trainning"
-    Public Sub TrainSpecial(TrainType$, Epoch&, setInputList As List(Of Double), setTargetList As List(Of Double), Optional Random As Boolean = False, Optional miniBatchSize& = 2)
-
-        Dim ErrorSignal#, SumES#
-        Dim ErrAccumulated#
-
-        Dim miniBatch As List(Of Long)
-        Dim NoMB#
-
+    Public Sub TrainSpecial(TrainType$, Epoch%, setInputList As List(Of Double), setTargetList As List(Of Double), Optional Random As Boolean = False, Optional mbSize% = 2)
 
         If setInputList Is Nothing Or setTargetList Is Nothing Or st_Train Then Exit Sub
         st_Train = False
 
-        Perf_Start()
-        ElapsedTime = Perf_Lap()
+        setTime()
+        ElapsedTime = 0
         'New Train Method
         'Input all input by list object, 1 by 1 to inputList with Setinput method
         'Use batchSize to get from list
@@ -558,11 +543,13 @@ ErrHandle:
         'Prepare - this step split those input/target list into group
         PrepareInOut(setInputList, setTargetList)
 
+        'Reset status field
         st_FF = 0
         st_Updated_N = 0
         st_Input = ""
         st_CurrEpoch = 0
         MaxEpoch = Epoch
+        minibatchsize = mbSize
 
         'SGD = loop 1 by 1
         'Batch = loop all item, accumulate all delta then update 1 time
@@ -570,202 +557,54 @@ ErrHandle:
 
         'Main section
 
-        ElapsedTime += Perf_Lap()
+        ElapsedTime += GetTime()
         Select Case TrainType
             Case "Stochastic"
-#Region "Stochastic"
-                ShowThreads()
+
+                'Case use new thread to train -- TODO: Create new class handle trainning at new thread in background / update multithread per loop for each layer (1 thread for 1 neuron)
                 'Train_Thread = New Threading.Thread(AddressOf Train_Stochastic)
                 'Train_Thread.Priority = Threading.ThreadPriority.AboveNormal
                 'Train_Thread.IsBackground = True
                 'Train_Thread.Start(myTimer)
                 Train_Stochastic()
-                'Console.WriteLine(Train_Thread.ThreadState)
-                Console.WriteLine("Start to print process")
-                Console.WriteLine(str.ToString)
-                ShowThreads()
-#End Region
+
             Case "Mini-Batch"
-#Region "Mini-Batch"
-                For T = 1 To Epoch
-                    Me.st_CurrEpoch = T
-                    ErrAccumulated = 0
-                    If miniBatchSize >= 0.55 * InData.Count Then
-                        Select Case InData.Count
-                            Case Is <= 10
-                                miniBatchSize = 2
-                            Case Is <= 100
-                                miniBatchSize = 10
-                            Case Is <= 1000
-                                miniBatchSize = CLng(0.1 * InData.Count)
-                            Case Else
-                                miniBatchSize = CLng(0.2 * InData.Count)
-                        End Select
-                    End If
 
-                    NoMB = InData.Count \ miniBatchSize
+                Train_MiniBatch()
 
-                    For m = 0 To InData.Count - 1 Step miniBatchSize
-
-                        miniBatch = New List(Of Long)
-                        For R = m To Math.Min(m + miniBatchSize - 1, InData.Count - 1)
-                            miniBatch.Add(R)
-                        Next
-
-                        '//Feedforward
-                        For n = 0 To miniBatch.Count - 1
-                            If SetInput(InData(miniBatch(n))) = False Then Exit Sub
-                            CurrentIndex = miniBatch(n)
-                            Calculate()
-                            Me.st_FF += 1
-
-                            'Backward propangation
-                            'Delta of output layer
-                            For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
-                                With Layers(Layers.Count - 1).Neurons(ii)
-                                    ErrorSignal = ErrorS(.ActivationFunction, .Value)
-                                    .AccDelta += ErrorSignal * (TargetData(miniBatch(n))(ii) - .Value) '* (1 - Momentum) + .Delta * Momentum
-                                End With
-                            Next ii
-                            'Delta of hidden layer
-                            For jj = Layers.Count - 2 To 1 Step -1
-                                For kk = 0 To Layers(jj).Neurons.Count - 1
-                                    ErrorSignal = 0
-                                    SumES = 0
-                                    With Layers(jj).Neurons(kk)
-                                        ErrorSignal = ErrorS(.ActivationFunction, .Value)
-                                        For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
-                                            SumES += Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).AccDelta
-                                        Next ii
-                                        .AccDelta = ErrorSignal * SumES '* (1 - Momentum) + .Delta * Momentum
-                                    End With
-                                Next kk
-                            Next jj
-
-                            'Calculate Error MSE
-                            ErrAccumulated += method_MSE()
-
-                        Next n
-
-                        'Update
-                        For ii = Layers.Count - 1 To 1 Step -1
-                            For jj = 0 To Layers(ii).Neurons.Count - 1
-                                With Layers(ii).Neurons(jj)
-                                    'Update Bias
-                                    .Bias += (LearningRate * .Delta)
-                                    'Update Weight
-                                    For kk = 0 To .Weights.Count - 1
-                                        .Weights(kk) += (LearningRate * Layers(ii - 1).Neurons(kk).Value) * (.AccDelta * (1 - Momentum) + .Delta * Momentum)
-                                        .Delta = .AccDelta
-                                        .AccDelta = 0
-                                    Next kk
-                                End With
-                            Next jj
-                        Next ii
-                        Me.st_Updated_N += 1
-
-
-                    Next m
-
-                    ErrAccumulated = ErrAccumulated / InData.Count
-                    globalError = ErrAccumulated
-                    errList.Add(globalError)
-
-                    ElapsedTime += Perf_Lap()
-                Next T
-#End Region
             Case "Batch"
-#Region "Batch"
-                For T = 1 To Epoch
-                    Me.st_CurrEpoch = T
-                    ErrAccumulated = 0
 
-                    For m = 0 To InData.Count - 1
+                Train_Batch()
 
-                        'random have no effect in batch trainning =.= random pos ?? no affect
-                        '//Feedforward
-                        If SetInput(InData(m)) = False Then Exit Sub
-                        CurrentIndex = m
-                        Calculate()
-                        Me.st_FF += 1
-
-                        'Backward propangation
-                        'Delta of output layer
-                        For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
-                            With Layers(Layers.Count - 1).Neurons(ii)
-                                ErrorSignal = ErrorS(.ActivationFunction, .Value)
-                                .AccDelta += ErrorSignal * (TargetData(m)(ii) - .Value) '* (1 - Momentum) + .Delta * Momentum
-                            End With
-                        Next ii
-                        'Delta of hidden layer
-                        For jj = Layers.Count - 2 To 1 Step -1
-                            For kk = 0 To Layers(jj).Neurons.Count - 1
-                                ErrorSignal = 0
-                                SumES = 0
-                                With Layers(jj).Neurons(kk)
-                                    ErrorSignal = ErrorS(.ActivationFunction, .Value)
-                                    For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
-                                        SumES += Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).AccDelta
-                                    Next ii
-                                    .AccDelta = ErrorSignal * SumES '* (1 - Momentum) + .Delta * Momentum
-                                End With
-                            Next kk
-                        Next jj
-
-                        'Calculate Error MSE
-                        ErrAccumulated = ErrAccumulated + method_MSE()
-                    Next m
-
-                    'Update
-                    For ii = Layers.Count - 1 To 1 Step -1
-                        For jj = 0 To Layers(ii).Neurons.Count - 1
-                            With Layers(ii).Neurons(jj)
-                                'Update Bias
-                                .Bias += (Me.LearningRate * .Delta)
-                                'Update Weight
-                                For kk = 0 To .Weights.Count - 1
-                                    .Weights(kk) += (Me.LearningRate * Layers(ii - 1).Neurons(kk).Value) * (.AccDelta * (1 - Momentum) + .Delta * Momentum)
-                                    .Delta = .AccDelta
-                                    .AccDelta = 0
-                                Next kk
-                            End With
-                        Next jj
-                    Next ii
-
-                    Me.st_Updated_N += 1
-
-                    ErrAccumulated = ErrAccumulated / InData.Count
-                    globalError = ErrAccumulated
-                    errList.Add(globalError)
-
-                    ElapsedTime += Perf_Lap()
-                Next T
-#End Region
         End Select
-        Perf_Stop()
-        Console.WriteLine(String.Format("Mainthread stop - end of main train method call -- State:{0} ThreadID:{1}", Threading.Thread.CurrentThread.ThreadState, Threading.Thread.CurrentThread.ManagedThreadId))
+        '//After finish train
+        Trained_Time += 1
+        Trained_Total_Epoch += Epoch
+
+        'Console.WriteLine(String.Format("Mainthread of traing stop -- ThreadID:{0} State:{1}", Threading.Thread.CurrentThread.ManagedThreadId, Threading.Thread.CurrentThread.ThreadState))
     End Sub
 
 #End Region
 
-    Private Sub ShowThreads()
-        Console.WriteLine(String.Format("ThreadID:{0} -- ThreadState:{1}", Threading.Thread.CurrentThread.ManagedThreadId, Threading.Thread.CurrentThread.ThreadState))
-    End Sub
+    Private Function ShowThreads() As String
+        Return String.Format("ThreadID:{0} -- ThreadState:{1}", Threading.Thread.CurrentThread.ManagedThreadId, Threading.Thread.CurrentThread.ThreadState)
+    End Function
 
-
+#Region "Stochastic"
     Public Sub Train_Stochastic()
         Dim ErrorSignal#, SumES#
         Dim ErrAccumulated#
 
         If st_Train Then Exit Sub
-
         st_Train = True
+
+        'Start train
         For T = 1 To MaxEpoch
+            ThreadSafe = False
             Me.st_CurrEpoch = T
             ErrAccumulated = 0
             For m = 0 To InData.Count - 1
                 '//Feedforward
-
                 '//TODO = Random deative neuron 
 
                 If SetInput(InData(m)) = False Then Exit Sub
@@ -814,24 +653,200 @@ ErrHandle:
                 'SGD Feedforward and backpropangation update 1 by 1
                 Me.st_Updated_N = Me.st_FF
                 ErrAccumulated += method_MSE()
-
             Next m
             ErrAccumulated = ErrAccumulated / InData.Count
             globalError = ErrAccumulated
             errList.Add(globalError)
-            ElapsedTime += Perf_Lap()
+            'Update time elapsed
+            ElapsedTime += GetTime()
+            ThreadSafe = True
 
-            str.Append("Finished batch " & T).AppendLine()
             Console.WriteLine("Finished batch " & T)
         Next T
 
-        ElapsedTime = 0
         st_Train = False
         Console.WriteLine("Finish train")
-
     End Sub
+#End Region
 
+#Region "Mini-Batch"
+    Public Sub Train_MiniBatch()
+        Dim ErrorSignal#, SumES#
+        Dim ErrAccumulated#
+        Dim miniBatch As List(Of Integer)
+        Dim NoMB#
 
+        If st_Train Then Exit Sub
+        st_Train = True
+
+        For T = 1 To MaxEpoch
+            ThreadSafe = False
+            Me.st_CurrEpoch = T
+            ErrAccumulated = 0
+            If minibatchsize >= 0.55 * InData.Count Then
+                Select Case InData.Count
+                    Case Is <= 10
+                        minibatchsize = 2
+                    Case Is <= 100
+                        minibatchsize = 10
+                    Case Is <= 1000
+                        minibatchsize = CInt(0.1 * InData.Count)
+                    Case Else
+                        minibatchsize = CInt(0.2 * InData.Count)
+                End Select
+            End If
+
+            NoMB = InData.Count \ minibatchsize
+
+            For m = 0 To InData.Count - 1 Step minibatchsize
+
+                miniBatch = New List(Of Integer)
+                For R = m To Math.Min(m + minibatchsize - 1, InData.Count - 1)
+                    miniBatch.Add(R)
+                Next
+
+                '//Feedforward
+                For n = 0 To miniBatch.Count - 1
+                    If SetInput(InData(miniBatch(n))) = False Then Exit Sub
+                    CurrentIndex = miniBatch(n)
+                    Calculate()
+                    Me.st_FF += 1
+
+                    'Backward propangation
+                    'Delta of output layer
+                    For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
+                        With Layers(Layers.Count - 1).Neurons(ii)
+                            ErrorSignal = ErrorS(.ActivationFunction, .Value)
+                            .AccDelta += ErrorSignal * (TargetData(miniBatch(n))(ii) - .Value) '* (1 - Momentum) + .Delta * Momentum
+                        End With
+                    Next ii
+                    'Delta of hidden layer
+                    For jj = Layers.Count - 2 To 1 Step -1
+                        For kk = 0 To Layers(jj).Neurons.Count - 1
+                            ErrorSignal = 0
+                            SumES = 0
+                            With Layers(jj).Neurons(kk)
+                                ErrorSignal = ErrorS(.ActivationFunction, .Value)
+                                For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
+                                    SumES += Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).AccDelta
+                                Next ii
+                                .AccDelta = ErrorSignal * SumES '* (1 - Momentum) + .Delta * Momentum
+                            End With
+                        Next kk
+                    Next jj
+
+                    'Calculate Error MSE
+                    ErrAccumulated += method_MSE()
+
+                Next n
+
+                'Update
+                For ii = Layers.Count - 1 To 1 Step -1
+                    For jj = 0 To Layers(ii).Neurons.Count - 1
+                        With Layers(ii).Neurons(jj)
+                            'Update Bias
+                            .Bias += (LearningRate * .Delta)
+                            'Update Weight
+                            For kk = 0 To .Weights.Count - 1
+                                .Weights(kk) += (LearningRate * Layers(ii - 1).Neurons(kk).Value) * (.AccDelta * (1 - Momentum) + .Delta * Momentum)
+                                .Delta = .AccDelta
+                                .AccDelta = 0
+                            Next kk
+                        End With
+                    Next jj
+                Next ii
+                Me.st_Updated_N += 1
+
+            Next m
+
+            ErrAccumulated = ErrAccumulated / InData.Count
+            globalError = ErrAccumulated
+            errList.Add(globalError)
+            ElapsedTime += GetTime()
+            ThreadSafe = True
+        Next T
+
+        st_Train = False
+    End Sub
+#End Region
+
+#Region "Batch"
+    Public Sub Train_Batch()
+        Dim ErrorSignal#, SumES#
+        Dim ErrAccumulated#
+
+        If st_Train Then Exit Sub
+        st_Train = True
+
+        For T = 1 To MaxEpoch
+            ThreadSafe = False
+            Me.st_CurrEpoch = T
+            ErrAccumulated = 0
+
+            For m = 0 To InData.Count - 1
+
+                'random have no effect in batch trainning =.= random pos ?? no affect
+                '//Feedforward
+                If SetInput(InData(m)) = False Then Exit Sub
+                CurrentIndex = m
+                Calculate()
+                Me.st_FF += 1
+
+                'Backward propangation
+                'Delta of output layer
+                For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
+                    With Layers(Layers.Count - 1).Neurons(ii)
+                        ErrorSignal = ErrorS(.ActivationFunction, .Value)
+                        .AccDelta += ErrorSignal * (TargetData(m)(ii) - .Value) '* (1 - Momentum) + .Delta * Momentum
+                    End With
+                Next ii
+                'Delta of hidden layer
+                For jj = Layers.Count - 2 To 1 Step -1
+                    For kk = 0 To Layers(jj).Neurons.Count - 1
+                        ErrorSignal = 0
+                        SumES = 0
+                        With Layers(jj).Neurons(kk)
+                            ErrorSignal = ErrorS(.ActivationFunction, .Value)
+                            For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
+                                SumES += Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).AccDelta
+                            Next ii
+                            .AccDelta = ErrorSignal * SumES '* (1 - Momentum) + .Delta * Momentum
+                        End With
+                    Next kk
+                Next jj
+
+                'Calculate Error MSE
+                ErrAccumulated = ErrAccumulated + method_MSE()
+            Next m
+
+            'Update
+            For ii = Layers.Count - 1 To 1 Step -1
+                For jj = 0 To Layers(ii).Neurons.Count - 1
+                    With Layers(ii).Neurons(jj)
+                        'Update Bias
+                        .Bias += (Me.LearningRate * .Delta)
+                        'Update Weight
+                        For kk = 0 To .Weights.Count - 1
+                            .Weights(kk) += (Me.LearningRate * Layers(ii - 1).Neurons(kk).Value) * (.AccDelta * (1 - Momentum) + .Delta * Momentum)
+                            .Delta = .AccDelta
+                            .AccDelta = 0
+                        Next kk
+                    End With
+                Next jj
+            Next ii
+
+            Me.st_Updated_N += 1
+
+            ErrAccumulated = ErrAccumulated / InData.Count
+            globalError = ErrAccumulated
+            errList.Add(globalError)
+
+            ElapsedTime += GetTime()
+            ThreadSafe = True
+        Next T
+        st_Train = False
+    End Sub
+#End Region
 
 End Class
 

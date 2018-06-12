@@ -58,8 +58,8 @@ Public Class GUI
         DNN.Load_NeuralNet()
         'Update current userform
         With Me
-            .cbLearningRate.Text = DNN.LearningRate
-            .cbMomentum.Text = (1 - DNN.Momentum)
+            .cbLearningRate.Text = CStr(DNN.LearningRate)
+            .cbMomentum.Text = CType((1 - DNN.Momentum), String)
             .cbNetSetting.Text = DNN.Network_Structure
         End With
     End Sub
@@ -117,13 +117,12 @@ Public Class GUI
     End Sub
 
     Private Sub bView_Click(sender As Object, e As EventArgs) Handles bView.Click
-        Dim ii&
-        Dim NumberOfInput&, NumberOfOutput&
+        Dim NumberOfInput%, NumberOfOutput%
         Dim IO As Byte
         Dim listTmp As List(Of String) = New List(Of String)
 
-        NumberOfInput = Split(cbNetSetting.Text, "=")(0)
-        NumberOfOutput = CDbl(Split(Split(cbNetSetting.Text, "=")(UBound(Split(cbNetSetting.Text, "="))), ".")(0))
+        NumberOfInput = DNN.InputSize
+        NumberOfOutput = DNN.OutputSize
         ' IO: 1= I, 2 = O
         If Math.Max(NumberOfInput, NumberOfOutput) = NumberOfInput Then IO = 1 Else IO = 2
 
@@ -152,7 +151,7 @@ Public Class GUI
     Private Sub Update_cbNetSetting()
         With cbNetSetting
             .Items.Clear()
-            .Items.AddRange(DB.Query("SELECT Value_Setting FROM SettingList").toArray())
+            .Items.AddRange(CType(DB.Query("SELECT Value_Setting FROM SettingList").toArray(), Object()))
         End With
     End Sub
 
@@ -181,10 +180,9 @@ Public Class GUI
     '****************************************************************************************************************************************
     '//Train Method of GUI
     '****************************************************************************************************************************************
+    Private listInput As List(Of Double) = New List(Of Double)
+    Private listTarget As List(Of Double) = New List(Of Double)
     Private Sub BTrain_Click(sender As Object, e As EventArgs) Handles BTrain.Click
-        Dim listInput As List(Of Double) = New List(Of Double)
-        Dim listTarget As List(Of Double) = New List(Of Double)
-
         'Get List input
         If Data.Count = 0 Then MsgBox("No input, abort Train !!") : Exit Sub
 
@@ -201,8 +199,8 @@ Public Class GUI
                 If .Build_NeuralNet(cbNetSetting.Text) = False Then MsgBox("Failed to setup network, check again!!") : Exit Sub
             End If
 
-            .LearningRate = cbLearningRate.Text
-            .Momentum = 1 - cbMomentum.Text
+            .LearningRate = CDbl(cbLearningRate.Text)
+            .Momentum = 1 - CDbl(cbMomentum.Text)
             .InData.Clear()
             .TargetData.Clear()
 
@@ -211,16 +209,28 @@ Public Class GUI
             myTimer.Enabled = True
 
             '//Train the network
-            .TrainSpecial(cbType.Text, cbEpoch.Text, listInput, listTarget, CheckRnd.Checked, cbSize.Text)
+            vType = cbType.Text
+            vEpoch = cbEpoch.Text
+            vSize = cbSize.Text
+            vRnd = CheckRnd.Checked
+            TrainTask = New Task(AddressOf Train_TaskHelper)
+            TrainTask.Start()
 
-            '//Deactive update GUI
-            myTimer.Enabled = False
-
+            'TrainTask.Wait()
             '//Output the result
             tbOutput.Text = .Result
             tbError.Text = .MSError
 
         End With
+    End Sub
+    Private TrainTask As Task
+    Private vType, vEpoch, vSize As String
+    Private vRnd As Boolean
+    Public Sub Train_TaskHelper()
+        DNN.TrainSpecial(vType, CInt(vEpoch), listInput, listTarget, vRnd, CInt(vSize))
+        myTimer.Enabled = False
+        UpdateWP()
+        Console.WriteLine(String.Format("Trained Time:{0} -- Trained Epoch:{1}", DNN.Trained_Time, DNN.Trained_Total_Epoch))
     End Sub
 
     '****************************************************************************************************************************************
@@ -228,34 +238,41 @@ Public Class GUI
     '****************************************************************************************************************************************
     Private Sub ElapsedUpdate(sender As Object, e As Timers.ElapsedEventArgs) Handles myTimer.Elapsed
         With DNN
-            Console.WriteLine(String.Format("Update interval called:{0} - At time:{1}", .st_CurrEpoch, .ElapsedTime))
-            .ElapsedTime += Perf_Lap()
-            If .Trained_Time = 0 Then Console.WriteLine("DNN not trained yet - Abort update GUI") : Exit Sub
+            Console.WriteLine(String.Format("Update interval called:{0} - At time:{1} - ThreadID:{2}", .st_CurrEpoch, .ElapsedTime, Threading.Thread.CurrentThread.ManagedThreadId))
+            If .Trained_Time = 0 And .st_Train = False Then Console.WriteLine("DNN not trained yet - Abort update GUI") : Exit Sub
             UpdateWP()
         End With
     End Sub
 
     Public Sub UpdateWP()
-        Dim d&
         Dim Delta$ = "", AccDelta$ = ""
-        Console.WriteLine(String.Format("called UpdateWP -- ThreadID:{0}", Threading.Thread.CurrentThread.ManagedThreadId))
+        Application.DoEvents()
         Try
-            SyncLock Me
+            If InvokeRequired Then
+                Console.WriteLine(String.Format("Called InvokeRequired UpdateWP -- ThreadID:{0}", Threading.Thread.CurrentThread.ManagedThreadId))
+                MyBase.Invoke(New MethodInvoker(AddressOf UpdateWP))
+            Else
+                Console.WriteLine(String.Format("Called Invoke UpdateWP -- ThreadID:{0}", Threading.Thread.CurrentThread.ManagedThreadId))
                 With DNN
+                    If Not .ThreadSafe Then
+                        Console.WriteLine("waiting Training task before Update GUI -- Train Thread is not safe yet")
+                        Threading.SpinWait.SpinUntil(Function() .ThreadSafe = True)
+                        Console.WriteLine("start Update GUI -- Train Thread is safe but not sure =.=")
+                    End If
                     '//update value on screen
                     'Me.Repaint
                     tbDebugInput.Text = .st_Input
-                    tbDebugOutput.Text = .Result
+                    tbDebugOutput.Text = .Current_Result
 
                     tbDelta.Text = ""
                     For d = 0 To .Layers(.Layers.Count - 1).Neurons.Count - 1
                         If Len(Delta) = 0 Then
-                            Delta = Math.Round(.Layers(.Layers.Count - 1).Neurons(d).Delta, 15)
+                            Delta = Math.Round(.Layers(.Layers.Count - 1).Neurons(d).Delta, 15).ToString
                         Else
                             Delta &= "|" & Math.Round(.Layers(.Layers.Count - 1).Neurons(d).Delta, 15)
                         End If
                         If Len(AccDelta) = 0 Then
-                            AccDelta = Math.Round(.Layers(.Layers.Count - 1).Neurons(d).AccDelta, 15)
+                            AccDelta = Math.Round(.Layers(.Layers.Count - 1).Neurons(d).AccDelta, 15).ToString
                         Else
                             AccDelta &= "|" & Math.Round(.Layers(.Layers.Count - 1).Neurons(d).AccDelta, 15)
                         End If
@@ -269,12 +286,11 @@ Public Class GUI
 
                     MyBase.Refresh()
                 End With
-            End SyncLock
-
-            Application.DoEvents()
+                Console.WriteLine(String.Format("Updated by UpdateWP on ThreadID:{0}", Threading.Thread.CurrentThread.ManagedThreadId))
+            End If
 
         Catch e As Exception
-            Console.WriteLine("Error occurs: " & e.Message)
+            Console.WriteLine("Error occurs on UpdateWP: " & e.Message)
         End Try
 
     End Sub
@@ -299,7 +315,7 @@ Public Class GUI
         createDefaultTable()
         'Console.WriteLine(DB.FullPath)
 
-        cbNetSetting.Items.AddRange(DB.Query("SELECT Value_Setting FROM Settinglist").toArray())
+        cbNetSetting.Items.AddRange(CType(DB.Query("SELECT Value_Setting FROM Settinglist").toArray(), Object()))
         If DB.Query("SELECT * FROM TrainingSET").Rows.Count > 0 Then
             cbGroupSel.DataSource = DB.Query("SELECT (date(dateCreated) || ' (' || setGroupName || ')..' || SUBSTR(SetInput,1,20) || '..' || SUBSTR(SetTarget,1,20) || '..' || SUBSTR(SetOutput,1,15) || '..' || SUBSTR(setError,1,15)) as Col1, setGroupName || SetID as Col2 FROM TrainingSET")
             cbGroupSel.DisplayMember = "Col1"

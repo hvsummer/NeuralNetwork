@@ -53,17 +53,6 @@ Namespace My
                 Return defaultInstance
             End Get
         End Property
-        
-        <Global.System.Configuration.ApplicationScopedSettingAttribute(),  _
-         Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
-         Global.System.Configuration.SpecialSettingAttribute(Global.System.Configuration.SpecialSetting.ConnectionString),  _
-         Global.System.Configuration.DefaultSettingValueAttribute("Data Source=(LocalDB)\MSSQLLocalDB;AttachDbFilename=|DataDirectory|\NeuralStore.m"& _ 
-            "df;Integrated Security=True;Connect Timeout=30")>  _
-        Public ReadOnly Property NeuralStoreConnectionString() As String
-            Get
-                Return CType(Me("NeuralStoreConnectionString"),String)
-            End Get
-        End Property
     End Class
 End Namespace
 

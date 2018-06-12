@@ -12,15 +12,28 @@ Public Module Support
         If source.Count = 0 Then ToStr = "Null" : Exit Function
         Return Join(source.ToArray, Delimiter)
     End Function
-
     <Extension()>
     Public Function ToStr(ByRef source As List(Of String), Optional Delimiter$ = ",") As String
         If source.Count = 0 Then ToStr = "Null" : Exit Function
         Return Join(source.ToArray, Delimiter)
     End Function
+    <Extension()>
+    Public Function ToStr(ByRef source As VariantType(,), Optional Delimiter$ = ",") As String
+        If source.Length = 0 Then ToStr = "Null" : Exit Function
+        Dim sb As New Text.StringBuilder
+        For Each g In source
+            sb.Append(g).Append(Delimiter)
+        Next
+        Return sb.Remove(sb.Length - 1, 1).ToString
+    End Function
 
     <Extension()>
     Public Function ToStr(ByRef source As IEnumerable(Of Double), Optional Delimiter$ = ",") As String
+        If source.Count = 0 Then ToStr = "Null" : Exit Function
+        Return source.ToArray.JoinDbl(Delimiter)
+    End Function
+    <Extension()>
+    Public Function ToStr(ByRef source As List(Of Double), Optional Delimiter$ = ",") As String
         If source.Count = 0 Then ToStr = "Null" : Exit Function
         Return source.ToArray.JoinDbl(Delimiter)
     End Function
@@ -39,17 +52,17 @@ Public Module Support
     <Extension()>
     Public Sub ImportFromArray(Of T)(ByRef source As List(Of T), Arr As Array)
         source.Clear()
-        For Each n In Arr
+        For Each n As T In Arr
             source.Add(n)
         Next
     End Sub
 
     <Extension()>
-    Public Function toArray(ByRef Source As DataTable)
+    Public Function toArray(ByRef Source As DataTable) As Object
         Return Source.AsEnumerable.Select(Function(d) DirectCast(d(0).ToString(), Object)).ToArray()
     End Function
     <Extension()>
-    Public Function toDict(ByRef Source As DataTable, FieldKey$)
+    Public Function toDict(ByRef Source As DataTable, FieldKey$) As Dictionary(Of String, List(Of String))
         Dim temp As New Dictionary(Of String, List(Of String))
 
         For ii = 0 To Source.Rows.Count - 1
@@ -59,7 +72,7 @@ Public Module Support
                     l.Add(Source.Rows(ii).Item(jj).ToString)
                 End If
             Next
-            temp.Add(Source.Rows(ii).Item(FieldKey), l)
+            temp.Add(Source.Rows(ii).Item(FieldKey).ToString, l)
         Next
         Return temp
     End Function
@@ -80,96 +93,107 @@ Public Module Support
         End With
     End Function
 
-    Public Function Trans1D(Inp As Array)
-        Dim tmpArr As New Object
-        Dim X&, y&
-        Dim Ux&, Uy&, Lx&, Ly&, I&
+    Public Function Trans1D(Inp As Object) As Object
+        Dim tmpArr() As VariantType = Nothing
+        Dim X%, y%
+        Dim Ux%, Uy%, Lx%, Ly%, I%
         Try
-            Select Case Inp.Rank
+            Select Case CType(Inp, Array).Rank
                 Case 2
-                    Ux = UBound(Inp, 1) : Lx = LBound(Inp, 1)
-                    Uy = UBound(Inp, 2) : Ly = LBound(Inp, 2)
+                    Dim g(,) = CType(Inp, VariantType(,))
+                    Ux = UBound(g, 1) : Lx = LBound(g, 1)
+                    Uy = UBound(g, 2) : Ly = LBound(g, 2)
                     Select Case True
                         Case Ux = Lx
                             If Ly = 0 Then ReDim tmpArr(0 To Uy - 1) Else ReDim tmpArr(0 To Uy - 1)
                             For y = Uy To Ly Step -1
-                                If Ly = 0 Then tmpArr(y) = Inp(Lx, y) Else tmpArr(y - 1) = Inp(Lx, y)
+                                If Ly = 0 Then tmpArr(y) = g(Lx, y) Else tmpArr(y - 1) = g(Lx, y)
                             Next
                         Case Uy = Ly
                             If Lx = 0 Then ReDim tmpArr(0 To Ux - 1) Else ReDim tmpArr(0 To Ux - 1)
                             For X = Ux To Lx Step -1
-                                If Lx = 0 Then tmpArr(X) = Inp(X, Ly) Else tmpArr(X - 1) = Inp(X, Ly)
+                                If Lx = 0 Then tmpArr(X) = g(X, Ly) Else tmpArr(X - 1) = g(X, Ly)
                             Next
                         Case Ux > Uy
                             ReDim tmpArr(0 To Ux * Uy - 1)
                             For y = Ly To Uy
                                 For X = Lx To Ux
-                                    If Not Inp(X, y) = vbEmpty Then tmpArr(I) = Inp(X, y) : I = I + 1
+                                    If Not g(X, y) = vbEmpty Then tmpArr(I) = g(X, y) : I = I + 1
                             Next X, y
                             ReDim Preserve tmpArr(0 To I - 1)
                         Case Uy > Ux
                             ReDim tmpArr(0 To Ux * Uy - 1)
                             For X = Lx To Ux
                                 For y = Ly To Uy
-                                    If Not Inp(X, y) = vbEmpty Then tmpArr(I) = Inp(X, y) : I = I + 1
+                                    If Not g(X, y) = vbEmpty Then tmpArr(I) = g(X, y) : I = I + 1
                             Next y, X
                             ReDim Preserve tmpArr(0 To I - 1)
                     End Select
+                    Return tmpArr
                 Case 0
-                    tmpArr = [Inp]
+                    Return [Inp].ToString
                 Case 1
-                    tmpArr = Inp
+                    Return Inp.ToString
                 Case Else
                     Return False
                     Exit Function
             End Select
-            Return tmpArr
         Catch e As Exception
             MsgBox(e.Message,, "An Error has been occurs")
             Return False
         End Try
     End Function
 
-    Public Function Trans(Inp As Array)
-        Dim tmpArr As New Object
-        Dim X&, y&
-        Dim Ux&, Uy&, Lx&, Ly&
+    Public Function Trans(Inp As Object) As Object
+        Dim X%, y%
+        Dim Ux%, Uy%, Lx%, Ly%
         Try
-            Select Case Inp.Rank
+            Select Case CType(Inp, Array).Rank
                 Case 0
                     Return False
                     Exit Function
                 Case 1
-                    Ux = UBound(Inp)
-                    Lx = LBound(Inp)
-                    ReDim tmpArr(0 To Ux - Lx + 1, 0 To 0)
+                    Dim g() = CType(Inp, VariantType())
+                    Ux = UBound(g)
+                    Lx = LBound(g)
+
+                    Dim tmpArr(0 To Ux - Lx + 1, 0 To 0) As VariantType
+
                     For X = Ux To Lx Step -1
-                        tmpArr(X, 1) = Inp(X)
+                        tmpArr(X, 1) = g(X)
                     Next
+                    Return tmpArr
                 Case 2
-                    Ux = UBound(Inp, 1) : Lx = LBound(Inp, 1)
-                    Uy = UBound(Inp, 2) : Ly = LBound(Inp, 2)
+                    Dim g(,) = CType(Inp, VariantType(,))
+                    Ux = UBound(g, 1) : Lx = LBound(g, 1)
+                    Uy = UBound(g, 2) : Ly = LBound(g, 2)
+
                     Select Case True
                         Case Ux = Lx
-                            ReDim tmpArr(0 To Uy - Ly + 1, 0 To 0)
+                            Dim tmpArr(0 To Uy - Ly + 1, 0 To 0) As VariantType
                             For y = Uy To Ly Step -1
-                                tmpArr(y, 1) = Inp(Ly, y)
+                                tmpArr(y, 1) = g(Ly, y)
                             Next
+                            Return tmpArr
                         Case Uy = Ly
-                            ReDim tmpArr(0 To 0, 0 To Ux - Lx + 1)
+                            Dim tmpArr(0 To 0, 0 To Ux - Lx + 1) As VariantType
                             For X = Ux To Lx Step -1
-                                tmpArr(1, X) = Inp(X, Lx)
+                                tmpArr(1, X) = g(X, Lx)
                             Next
+                            Return tmpArr
                         Case Else
-                            ReDim tmpArr(0 To Uy - Ly + 1, 0 To Ux - Lx + 1)
+                            Dim tmpArr(0 To Uy - Ly + 1, 0 To Ux - Lx + 1) As VariantType
                             For y = Ly To Uy
                                 For X = Lx To Ux
-                                    tmpArr(y, X) = Inp(X, y)
+                                    tmpArr(y, X) = g(X, y)
                                 Next
                             Next
+                            Return tmpArr
                     End Select
+                Case Else
+                    Return False
             End Select
-            Return tmpArr
+
         Catch e As Exception
             MsgBox(e.Message,, "An Error has been occurs")
             Return False
@@ -189,7 +213,7 @@ Public Module Support
         Next
     End Function
 
-    Public Function ReadFile(FName$, Optional Deli$ = ",")
+    Public Function ReadFile(FName$, Optional Deli$ = ",") As String
         Dim tmp As List(Of String)
         tmp = New List(Of String)
         Try
@@ -211,7 +235,7 @@ Public Module Support
             Return "0"
         End Try
     End Function
-    Public Function ReadFile(FName$)
+    Public Function ReadFile(FName$) As List(Of String)
         Dim tmp As List(Of String)
         tmp = New List(Of String)
         Try
@@ -230,10 +254,10 @@ Public Module Support
         Catch e As Exception
             ' Let the user know what went wrong.
             MsgBox("The file could not be read:" & vbCrLf & e.Message)
-            Return "0"
+            Return New List(Of String) From {"0"}
         End Try
     End Function
-    Public Function WriteFile(ByRef Arr As List(Of String), fileName$, Optional DesPath$ = "") ' HeaderArr,
+    Public Function WriteFile(ByRef Arr As List(Of String), fileName$, Optional DesPath$ = "") As Boolean ' HeaderArr,
         Dim s As String
         Try
             If DesPath.Length = 0 Then DesPath = DesktopPath()
@@ -253,7 +277,7 @@ Public Module Support
     End Function
 
     'Relative path of project
-    Public Function CurProjectPath()
+    Public Function CurProjectPath() As String
         '//2 other ways
         'Application.Info.DirectoryPath
         'Application.ExecutablePath
