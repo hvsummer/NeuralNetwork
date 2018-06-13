@@ -349,31 +349,31 @@ Public Class NeuralNet
         End Select
         Return ActiveF
     End Function
-    Private Function ErrorS(AFType As String, sum As Double) As Double
+    Private Function dActiveF(AFType As String, sum As Double) As Double
         Select Case AFType
             Case "Sigmoid"
-                ErrorS = ActiveF(AFType, sum) * (1 - ActiveF(AFType, sum))
+                dActiveF = ActiveF(AFType, sum) * (1 - ActiveF(AFType, sum))
             Case "Leaky_RELU"
-                ErrorS = If(sum < 0, 0.01, 1)
+                dActiveF = If(sum < 0, 0.01, 1)
             Case "Soft_Plus"
-                ErrorS = 1 / (1 + Math.Abs(sum)) ^ 2
+                dActiveF = 1 / (1 + Math.Abs(sum)) ^ 2
             Case "Bent_Identity"
-                ErrorS = sum / (2 * (sum ^ 2 + 1) ^ 0.5) + 1
+                dActiveF = sum / (2 * (sum ^ 2 + 1) ^ 0.5) + 1
         End Select
-        Return ErrorS
+        Return dActiveF
     End Function
 
     Public Function method_MSE(Optional m% = -1) As Double
         'Calculate Error RSM
-        Dim ErrorSignal As Double = 0
+        Dim dActiveFignal As Double = 0
         If m = -1 Then m = CurrentIndex
         For ii = 0 To OutputSize - 1
             With Layers(Layers.Count - 1).Neurons(ii)
-                ErrorSignal = ErrorSignal + (TargetData(m)(ii) - .Value) ^ 2
+                dActiveFignal = dActiveFignal + (TargetData(m)(ii) - .Value) ^ 2
             End With
         Next ii
 
-        Return ErrorSignal / (2 * OutputSize)
+        Return dActiveFignal / (2 * OutputSize)
     End Function
 
 #Region "Method to Set Input/Target Network"
@@ -516,7 +516,7 @@ ErrHandle:
 
 #Region "Stochastic"
     Public Sub Train_Stochastic()
-        Dim ErrorSignal#, SumES#
+        Dim dActFunc#, SumES#
         Dim ErrAccumulated#
 
         If st_Train Then Exit Sub
@@ -540,23 +540,23 @@ ErrHandle:
                 'Delta of output layer
                 For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
                     With Layers(Layers.Count - 1).Neurons(ii)
-                        ErrorSignal = ErrorS(.ActivationFunction, .Value)
-                        'New * (1-p) + Old * p ; New = GD of Activation * GD of Loss
-                        .Delta = ErrorSignal * (TargetData(m)(ii) - .Value) * (1 - Momentum) + .Delta * Momentum
+                        dActFunc = dActiveF(.ActivationFunction, .Value)
+                        'New * (1-p) + Old * p which New = GD of Activation * GD of Loss
+                        .Delta = dActFunc * (TargetData(m)(ii) - .Value) * (1 - Momentum) + .Delta * Momentum
                     End With
                 Next ii
                 'Delta of hidden layer
                 For jj = Layers.Count - 2 To 1 Step -1
                     For kk = 0 To Layers(jj).Neurons.Count - 1
-                        ErrorSignal = 0
+                        dActFunc = 0
                         SumES = 0
                         With Layers(jj).Neurons(kk)
-                            ErrorSignal = ErrorS(.ActivationFunction, .Value)
+                            dActFunc = dActiveF(.ActivationFunction, .Value)
                             'New in this situation = GD of Activation * Sum of (Weight(i+1) * Delta(i+1)) of layer i + 1 
                             For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
                                 SumES += Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).Delta
                             Next ii
-                            .Delta = ErrorSignal * SumES * (1 - Momentum) + .Delta * Momentum
+                            .Delta = dActFunc * SumES * (1 - Momentum) + .Delta * Momentum
                         End With
                     Next kk
                 Next jj
@@ -598,7 +598,7 @@ ErrHandle:
 
 #Region "Mini-Batch"
     Public Sub Train_MiniBatch()
-        Dim ErrorSignal#, SumES#
+        Dim dActiveFignal#, SumES#
         Dim ErrAccumulated#
         Dim miniBatch As List(Of Integer)
         Dim NoMB#
@@ -643,21 +643,21 @@ ErrHandle:
                     'Delta of output layer
                     For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
                         With Layers(Layers.Count - 1).Neurons(ii)
-                            ErrorSignal = ErrorS(.ActivationFunction, .Value)
-                            .AccDelta += ErrorSignal * (TargetData(miniBatch(n))(ii) - .Value) '* (1 - Momentum) + .Delta * Momentum
+                            dActiveFignal = dActiveF(.ActivationFunction, .Value)
+                            .AccDelta += dActiveFignal * (TargetData(miniBatch(n))(ii) - .Value) '* (1 - Momentum) + .Delta * Momentum
                         End With
                     Next ii
                     'Delta of hidden layer
                     For jj = Layers.Count - 2 To 1 Step -1
                         For kk = 0 To Layers(jj).Neurons.Count - 1
-                            ErrorSignal = 0
+                            dActiveFignal = 0
                             SumES = 0
                             With Layers(jj).Neurons(kk)
-                                ErrorSignal = ErrorS(.ActivationFunction, .Value)
+                                dActiveFignal = dActiveF(.ActivationFunction, .Value)
                                 For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
                                     SumES += Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).AccDelta
                                 Next ii
-                                .AccDelta = ErrorSignal * SumES '* (1 - Momentum) + .Delta * Momentum
+                                .AccDelta = dActiveFignal * SumES '* (1 - Momentum) + .Delta * Momentum
                             End With
                         Next kk
                     Next jj
@@ -699,7 +699,7 @@ ErrHandle:
 
 #Region "Batch"
     Public Sub Train_Batch()
-        Dim ErrorSignal#, SumES#
+        Dim dActiveFignal#, SumES#
         Dim ErrAccumulated#
 
         If st_Train Then Exit Sub
@@ -723,21 +723,21 @@ ErrHandle:
                 'Delta of output layer
                 For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
                     With Layers(Layers.Count - 1).Neurons(ii)
-                        ErrorSignal = ErrorS(.ActivationFunction, .Value)
-                        .AccDelta += ErrorSignal * (TargetData(m)(ii) - .Value) '* (1 - Momentum) + .Delta * Momentum
+                        dActiveFignal = dActiveF(.ActivationFunction, .Value)
+                        .AccDelta += dActiveFignal * (TargetData(m)(ii) - .Value) '* (1 - Momentum) + .Delta * Momentum
                     End With
                 Next ii
                 'Delta of hidden layer
                 For jj = Layers.Count - 2 To 1 Step -1
                     For kk = 0 To Layers(jj).Neurons.Count - 1
-                        ErrorSignal = 0
+                        dActiveFignal = 0
                         SumES = 0
                         With Layers(jj).Neurons(kk)
-                            ErrorSignal = ErrorS(.ActivationFunction, .Value)
+                            dActiveFignal = dActiveF(.ActivationFunction, .Value)
                             For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
                                 SumES += Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).AccDelta
                             Next ii
-                            .AccDelta = ErrorSignal * SumES '* (1 - Momentum) + .Delta * Momentum
+                            .AccDelta = dActiveFignal * SumES '* (1 - Momentum) + .Delta * Momentum
                         End With
                     Next kk
                 Next jj
@@ -786,16 +786,24 @@ Public Class NN_Array
     Public ID%
 
     Public Layers As List(Of DArray)
+    Public Bias_Layers As List(Of DArray)
+
+    Public Active As Boolean
+    Public LearningRate As Double = 0.4
+    Public minibatchsize As Integer = 2
+    Public MaxEpoch As Integer
 
     '2 set of input data and target data using in each loop
     Public InData As List(Of List(Of Double))
     Public TargetData As List(Of List(Of Double))
 
-    Public Active As Boolean
-
-    Public Delegate Function AF(v As Double) As Double
+    'Delegate
+    Public Delegate Function AF(v As Double, GD As Boolean) As Double
+    Public Delegate Function LF(l1 As DArray, l2 As DArray) As DArray
     Public ActivationFunction As AF
+    Public LossFunction As LF
 
+    'Property
     Public ReadOnly Property InputSize As Integer = Layers(0).Columns
     Public ReadOnly Property OutputSize As Integer = Layers(Layers.Count - 1).Columns
 
@@ -803,9 +811,17 @@ Public Class NN_Array
         ID = stored_ID
         stored_ID += 1
     End Sub
+    Protected Overrides Sub Finalize()
+        InData.Clear()
+        TargetData.Clear()
+        Layers.Clear()
+        MyBase.Finalize()
+    End Sub
+
     Public Shared Function count() As Integer
         Return stored_ID
     End Function
+
 
     Public Function Build_NeuralNet(Genetic As String) As Boolean
         Dim strNetwork$
@@ -828,11 +844,15 @@ Public Class NN_Array
             Build_NeuralNet = False
         End If
     End Function
-    Public Sub AddLayer(NoNeuron%, Optional lastLayersNeuron% = 1)
+    Public Sub AddLayer(NoNeuron%, Optional preLayersNeuron% = 1)
         If Me.Active = True Then Exit Sub
-        Dim L As New DArray(lastLayersNeuron, NoNeuron)
+        Dim L As New DArray(preLayersNeuron, NoNeuron)
         L.Fill(-0.01, 0.01)
         Layers.Add(L)
+
+        If Layers.Count > 1 Then
+            Bias_Layers.Add((New DArray(Layers(Layers.Count - 2).Rows, Layers(Layers.Count - 1).Columns)).Fill(-0.5, 0.5))
+        End If
     End Sub
 
 #Region "Method to Set Input/Target Network"
@@ -868,10 +888,42 @@ Public Class NN_Array
         Dim t As DArray
         t = Layers(0).Multiply(Layers(1))
         For i = 1 To Layers.Count - 2
-            t = t.Multiply(Layers(i + 1))
-            t.ApplyFunc(Function(x) ActivationFunction.Invoke(x))
+            t = t.Multiply(Layers(i + 1)) + Bias_Layers(i - 1)
+            t.ApplyFunc(Function(x) ActivationFunction.Invoke(x, False))
         Next
         Layers(Layers.Count - 1) = t
+    End Sub
+
+    Public Sub DefaultTrain(epoch_limit%, desired_error#)
+        Dim Epoch%
+        Dim nnError# = 1000
+        Dim t As DArray
+        Dim D As DArray
+
+        MaxEpoch = epoch_limit
+        While Epoch < epoch_limit And nnError > desired_error
+            Dim Errors As New List(Of Double)
+            For i = 0 To InData.Count - 1
+                'Feed Forward
+                SetInput(InData(i))
+                Calculate()
+
+                'Back Propangation
+                'Error Matrix of Last Layer
+                t = LossFunction.Invoke((New DArray(TargetData(i))), Layers(Layers.Count - 1))
+                Errors.Add(t.Max())
+
+                For index = Layers.Count - 1 To 1 Step -1
+                    'Array Delta = error * array of output with applied d_activationfunction
+                    D = t * Layers(index).ApplyFunc(Function(x) ActivationFunction.Invoke(x, True))
+                    Layers(index) += Layers(index - 1).T.Dot(D) * LearningRate
+                Next
+            Next
+            nnError = Errors.Max()
+            Console.WriteLine(String.Format("Epoch: {0} (of maximum {1}), max error: {2} (of desired < {3})", Epoch, epoch_limit, nnError, desired_error))
+            Epoch += 1
+        End While
+        Console.WriteLine("Finish Trainning !!")
     End Sub
 
 End Class
@@ -886,32 +938,32 @@ Public NotInheritable Class FunctionList
 
     Public NotInheritable Class Activation
 
-        Public Shared Function Sigmoid(Value As Double, Optional GD% = 0) As Double
-            If GD = 0 Then
+        Public Shared Function Sigmoid(Value As Double, Optional GD As Boolean = False) As Double
+            If Not GD Then
                 Return 1 / (1 + Math.Exp(-Value))
             Else
                 Return Sigmoid(Value) * (1 - Sigmoid(Value))
             End If
         End Function
 
-        Public Shared Function LeakyRELU(Value As Double, Optional GD% = 0) As Double
-            If GD = 0 Then
+        Public Shared Function LeakyRELU(Value As Double, Optional GD As Boolean = False) As Double
+            If Not GD Then
                 Return If(Value < 0, 0.01 * Value, Value)
             Else
                 Return If(Value < 0, 0.01, 1)
             End If
         End Function
 
-        Public Shared Function SoftPlus(Value As Double, Optional GD% = 0) As Double
-            If GD = 0 Then
+        Public Shared Function SoftPlus(Value As Double, Optional GD As Boolean = False) As Double
+            If Not GD Then
                 Return Math.Log(1 + Math.Exp(Value))
             Else
                 Return 1 / (1 + Math.Abs(Value)) ^ 2
             End If
         End Function
 
-        Public Shared Function BentIndentity(Value As Double, Optional GD% = 0) As Double
-            If GD = 0 Then
+        Public Shared Function BentIndentity(Value As Double, Optional GD As Boolean = False) As Double
+            If Not GD Then
                 Return ((Value ^ 2 + 1) ^ 0.5 - 1) / 2 + Value
             Else
                 Return Value / (2 * (Value ^ 2 + 1) ^ 0.5) + 1
@@ -927,31 +979,35 @@ Public NotInheritable Class FunctionList
         ''' </summary>
 
 
-        Public Shared Function Hinge(yHat As List(Of Decimal), y As List(Of Decimal)) As Decimal
+        Public Shared Function Hinge(yHat As List(Of Double), y As List(Of Double)) As Double
             'Used for classification
-            Dim sum As Decimal
+            Dim sum As Double
             For i = 0 To y.Count - 1
                 sum = Math.Max(0, 1 - yHat(i) * y(i))
             Next
             Return sum
         End Function
 
-        Public Shared Function MAE(yHat As List(Of Decimal), y As List(Of Decimal)) As Decimal
+        Public Shared Function MAE(yHat As List(Of Double), y As List(Of Double)) As Double
             'L1 Loss
-            Dim sum As Decimal
+            Dim sum As Double
             For i = 0 To y.Count - 1
                 sum += Math.Abs(yHat(i) - y(i))
             Next
             Return sum
         End Function
 
-        Public Shared Function MSE(yHat As List(Of Decimal), y As List(Of Decimal)) As Decimal
+        Public Shared Function MSE(yHat As List(Of Double), y As List(Of Double)) As Double
             'L2 Loss
-            Dim sum As Decimal
+            Dim sum As Double
             For i = 0 To y.Count - 1
-                sum += (yHat(i) - y(i)) * (yHat(i) - y(i))
+                sum += (yHat(i) - y(i)) ^ 2
             Next
             Return sum / (2 * y.Count)
+        End Function
+        Public Shared Function MSE(yHat As DArray, y As DArray) As DArray
+            'de of L2 Loss
+            Return yHat - y
         End Function
 
     End Class
