@@ -117,7 +117,6 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="clsLayer.vb" />
-    <Compile Include="clsNeuron.vb" />
     <Compile Include="DbBrigde.vb" />
     <Compile Include="clsArrayNeural.vb" />
     <Compile Include="Mod_SupportFunc.vb" />

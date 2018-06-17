@@ -266,16 +266,16 @@ Public Class GUI
                     tbDebugOutput.Text = .Current_Result
 
                     tbDelta.Text = ""
-                    For d = 0 To .Layers(.Layers.Count - 1).Neurons.Count - 1
+                    For d = 0 To .Layers(.Layers.Count - 1)._Count - 1
                         If Len(Delta) = 0 Then
-                            Delta = Math.Round(.Layers(.Layers.Count - 1).Neurons(d).Delta, 15).ToString
+                            Delta = Math.Round(.Layers(.Layers.Count - 1)._Delta(d), 15).ToString
                         Else
-                            Delta &= "|" & Math.Round(.Layers(.Layers.Count - 1).Neurons(d).Delta, 15)
+                            Delta &= "|" & Math.Round(.Layers(.Layers.Count - 1)._Delta(d), 15)
                         End If
                         If Len(AccDelta) = 0 Then
-                            AccDelta = Math.Round(.Layers(.Layers.Count - 1).Neurons(d).AccDelta, 15).ToString
+                            AccDelta = Math.Round(.Layers(.Layers.Count - 1)._AccDelta(d), 15).ToString
                         Else
-                            AccDelta &= "|" & Math.Round(.Layers(.Layers.Count - 1).Neurons(d).AccDelta, 15)
+                            AccDelta &= "|" & Math.Round(.Layers(.Layers.Count - 1)._AccDelta(d), 15)
                         End If
                     Next d
                     tbDelta.Text = Delta & vbCrLf & AccDelta

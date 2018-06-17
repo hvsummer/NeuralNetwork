@@ -1,4 +1,5 @@
 ﻿Option Explicit On
+Imports System.Reflection
 
 Public Structure Status
     Public st_FF%
@@ -10,11 +11,12 @@ End Structure
 
 
 '// Define Neural Network ================================================================================================================================================
+
 Public Class NeuralNet
 
 #Region "//Variable used in network//"
 
-    Public Layers As List(Of layer)
+    Public Layers As List(Of Layer)
     Private NetName As String
     Public LearningRate#
     Public Momentum#
@@ -47,8 +49,8 @@ Public Class NeuralNet
 
 #Region "Delegate"
 
-    Public Delegate Sub DelegateTrain(Layers As List(Of layer), InData As List(Of List(Of Double)), TargetData As List(Of List(Of Double)), stt As Status, AF As ActivationFunc)
-    Public Delegate Function ActivationFunc(X As Double) As Double
+    Public Delegate Sub DelegateTrain(Layers As List(Of Layer), InData As List(Of List(Of Double)), TargetData As List(Of List(Of Double)), stt As Status, AF As ActivationFunc)
+    Public Delegate Function ActivationFunc(X As Double, GD As Boolean) As Double
 
 
 #End Region
@@ -57,7 +59,7 @@ Public Class NeuralNet
 
     '//Default
     Public Sub New()
-        Layers = New List(Of layer)
+        Layers = New List(Of Layer)
         'default value
         LearningRate = 0.25
         Momentum = 0.3
@@ -111,12 +113,12 @@ Public Class NeuralNet
 
     Public ReadOnly Property InputSize() As Integer
         Get
-            Return Layers(0).Neurons.Count
+            Return Layers(0)._Count
         End Get
     End Property
     Public ReadOnly Property OutputSize() As Integer
         Get
-            Return Layers(Layers.Count - 1).Neurons.Count
+            Return Layers(Layers.Count - 1)._Count
         End Get
     End Property
     Public ReadOnly Property ErrorArray() As List(Of Double)
@@ -138,11 +140,11 @@ Public Class NeuralNet
         Get
             Dim Str As New Text.StringBuilder
             For ii = 0 To Me.Layers.Count - 1
-                For jj = 0 To Me.Layers.Item(ii).Neurons.Count - 1
+                For jj = 0 To Layers.Item(ii)._Count - 1
                     If Str.Length = 0 Then
-                        Str.Append(Layers.Item(ii).Neurons.Item(jj).Info)
+                        Str.Append(Layers.Item(ii).Info(jj))
                     Else
-                        Str.Append(vbCrLf).Append(Me.Layers.Item(ii).Neurons.Item(jj).Info)
+                        Str.Append(vbCrLf).Append(Layers.Item(ii).Info(jj))
                     End If
                 Next
             Next
@@ -156,14 +158,14 @@ Public Class NeuralNet
 
             For ii = 1 To Me.Layers.Count - 2
                 If str.Length = 0 Then
-                    str.Append(Layers.Item(ii).Neurons.Count).Append(".").Append(Layers.Item(ii).Neurons.Item(0).ActivationFunction)
+                    str.Append(Layers.Item(ii)._Count).Append(".").Append(Layers.Item(ii)._AF.Method.Name)
                 Else
-                    str.Append("+").Append(Layers.Item(ii).Neurons.Count).Append(".").Append(Layers.Item(ii).Neurons.Item(0).ActivationFunction)
+                    str.Append("=").Append(Layers.Item(ii)._Count).Append(".").Append(Layers.Item(ii)._AF.Method.Name)
                 End If
             Next ii
-            str.Append("=").Append(Me.Layers.Item(Me.Layers.Count - 1).Neurons.Count).Append(".").Append(Me.Layers.Item(Me.Layers.Count - 1).Neurons.Item(0).ActivationFunction)
+            str.Append("=").Append(OutputSize).Append(".").Append(Layers.Item(Me.Layers.Count - 1)._AF.Method.Name)
 
-            Return Me.Layers.Item(0).Neurons.Count & "=" & str.ToString
+            Return InputSize & "=" & str.ToString
         End Get
     End Property
 
@@ -173,9 +175,9 @@ Public Class NeuralNet
             'Output
             For ii = 0 To OutputSize - 1
                 If ii > 0 Then
-                    R &= Deli & Math.Round(Layers(Layers.Count - 1).Neurons(ii).Value, 8)
+                    R &= Deli & Math.Round(Layers(Layers.Count - 1)._Value(ii), 8)
                 Else
-                    R = Math.Round(Layers(Layers.Count - 1).Neurons(ii).Value, 8).ToString
+                    R = Math.Round(Layers(Layers.Count - 1)._Value(ii), 8).ToString
                 End If
             Next
             Return R
@@ -217,7 +219,7 @@ Public Class NeuralNet
 
     Public Sub Reset()
         Layers.Clear()
-        Layers = New List(Of layer)
+        Layers = New List(Of Layer)
         errList.Clear()
         errList = New List(Of Double)
         Active = False
@@ -238,9 +240,7 @@ Public Class NeuralNet
             .Add(LearningRate & "-" & Momentum & "-" & Math.Round(globalError, 15))
 
             For ii = 0 To Layers.Count - 1
-                For jj = 0 To Layers(ii).Neurons.Count - 1
-                    .Add(Layers(ii).Neurons(jj).DNA.ToStr("|"))
-                Next
+                'TODO Serializable object (layer)
             Next
         End With
         If Len(Path) < 3 Then
@@ -265,10 +265,7 @@ Public Class NeuralNet
             .Momentum = CDbl(Split(Str(2), "-")(1))
             .globalError = CDbl(Split(Str(2), "-")(2))
             For ii = 0 To Me.Layers.Count - 1
-                For jj = 0 To Me.Layers(ii).Neurons.Count - 1
-                    .Layers(ii).Neurons(jj).DNA = C2List(Str(c + 3), " ")
-                    c = c + 1
-                Next
+                'TODO De-Serializable object (layer)
             Next
         End With
     End Sub
@@ -278,17 +275,20 @@ Public Class NeuralNet
 #Region "Method Build Network"
     '// 2 method to build up network
     Public Function Build_NeuralNet(Genetic As String) As Boolean
-        Dim strNetwork$
+        Dim strLayer$
+        Dim t() As String
         If Not Active Then
             With Me
                 For ii = 0 To UBound(Split(Genetic, "="))
-                    strNetwork = Split(Genetic, "=")(ii)
-                    If InStr(1, strNetwork, ".") > 0 Then
-                        For jj = 0 To UBound(Split(strNetwork, "+"))
-                            .AddLayer(CInt(Split(Split(strNetwork, "+")(jj), ".")(0)), Split(Split(strNetwork, "+")(jj), ".")(1))
-                        Next
+                    strLayer = Split(Genetic, "=")(ii)
+                    If InStr(1, strLayer, ".") > 0 Then
+                        t = Split(strLayer, ".")
+                        .AddLayer(CInt(Split(Genetic, "=")(ii)),
+                                  CInt(t(0)),
+                                  DirectCast(FunctionList.Activation.CallByName(t(1)), ActivationFunc))
                     Else
-                        .AddLayer(CInt(strNetwork))
+                        .AddLayer(CInt(Split(Genetic, "=")(ii)),
+                                  CInt(strLayer))
                     End If
                 Next
             End With
@@ -299,19 +299,13 @@ Public Class NeuralNet
         End If
     End Function
 
-    Public Sub AddLayer(NoNeuron%, Optional AF$ = "Leaky_RELU")
+    Public Sub AddLayer(Input%, Output%, Optional AF As ActivationFunc = Nothing)
         If Me.Active = True Then Exit Sub
-        Dim L As layer = New layer
-        With L
-            .ActivationFunction = If(Layers.Count = 0, "", AF)
-            .ID = Layers.Count + 1
-            If Layers.Count = 0 Then
-                .Create(NoNeuron, 0, "")
-            Else
-                .Create(NoNeuron, Layers(Layers.Count - 1).Neurons.Count)
-            End If
-        End With
+
+        If AF Is Nothing Then AF = AddressOf FunctionList.Activation.LeakyRELU
+        Dim L As Layer = New Layer(Input, Output, AF)
         Layers.Add(L)
+
     End Sub
 
 #End Region
@@ -321,10 +315,8 @@ Public Class NeuralNet
 
         If InData Is Nothing And TargetData Is Nothing Then MsgBox("Please feed data into network with PrepareInOut Method before train",, "Warning") : Exit Sub
 
-        If AF Is Nothing Then
-            'AF = New ActivationFunc(AddressOf FunctionList.Activation.Sigmoid)
-            AF = AddressOf FunctionList.Activation.LeakyRELU
-        End If
+        If AF Is Nothing Then AF = AddressOf FunctionList.Activation.LeakyRELU
+        'AF = New ActivationFunc(AddressOf FunctionList.Activation.Sigmoid)
 
         For i = 1 To Epoch
             Me.st_CurrEpoch = i
@@ -368,8 +360,8 @@ Public Class NeuralNet
         Dim dActiveFignal As Double = 0
         If m = -1 Then m = CurrentIndex
         For ii = 0 To OutputSize - 1
-            With Layers(Layers.Count - 1).Neurons(ii)
-                dActiveFignal = dActiveFignal + (TargetData(m)(ii) - .Value) ^ 2
+            With Layers(Layers.Count - 1)
+                dActiveFignal = dActiveFignal + (TargetData(m)(ii) - ._Value(ii)) ^ 2
             End With
         Next ii
 
@@ -379,14 +371,19 @@ Public Class NeuralNet
 #Region "Method to Set Input/Target Network"
     '//input with setinput, output with result
     Public Function SetInput(InArray As List(Of Double)) As Boolean
-        If InArray.Count > Layers.Item(0).Neurons.Count Then _
-    MsgBox("Input array's Size: " & InArray.Count & " does not match with network: " & Layers.Item(0).Neurons.Count) : SetInput = False : Exit Function
 
-        For ii = 0 To Layers(0).Neurons.Count - 1
-            Layers(0).Neurons(ii).Value = InArray(ii)
+        If InArray.Count > InputSize Then
+            MsgBox("Input array's Size: " & InArray.Count & " does not match with current input size: " & InputSize)
+            Return False
+            Exit Function
+        End If
+
+        For ii = 0 To Layers(0)._Count - 1
+            Layers(0)._Value(ii) = InArray(ii)
         Next
+
         st_Input = InArray.ToStr("|")
-        SetInput = True
+        Return True
     End Function
 
     Public Sub PrepareInOut(setInputList As List(Of Double), setTargetList As List(Of Double))
@@ -412,14 +409,13 @@ Public Class NeuralNet
         Dim sum#
         Try
             For ii = 1 To Layers.Count - 1
-                For jj = 0 To Layers.Item(ii).Neurons.Count - 1
-                    With Layers.Item(ii).Neurons.Item(jj)
-                        'GetTime()
+                For jj = 0 To Layers.Item(ii)._Count - 1
+                    With Layers.Item(ii)
                         sum = 0
-                        For k = 0 To Layers.Item(ii - 1).Neurons.Count - 1
-                            sum = sum + Layers.Item(ii - 1).Neurons.Item(k).Value * .Weights.Item(k)
+                        For k = 0 To Layers.Item(ii - 1)._Count - 1
+                            sum = sum + Layers.Item(ii - 1)._Value(k) * ._Weights(k, jj)
                         Next k
-                        .Value = ActiveF(.ActivationFunction, sum + .Bias)
+                        ._Value(jj) = ._AF.Invoke(sum + ._Bias(jj), False)
                     End With
                 Next
             Next
@@ -428,28 +424,26 @@ Public Class NeuralNet
             Console.WriteLine(" Error while calculate network!! " & vbTab & Err.Description & vbCrLf & e.Message)
             Return False
         End Try
-
     End Function
     Public Overloads Function Calculate(AF As ActivationFunc) As Boolean
         Dim sum#
-        On Error GoTo ErrHandle
-        Calculate = False
-        For ii = 1 To Layers.Count - 1
-            For jj = 0 To Layers.Item(ii).Neurons.Count - 1
-                With Layers.Item(ii).Neurons.Item(jj)
-                    'GetTime()
-                    sum = 0
-                    For k = 0 To Layers.Item(ii - 1).Neurons.Count - 1
-                        sum = sum + Layers.Item(ii - 1).Neurons.Item(k).Value * .Weights.Item(k)
-                    Next k
-                    .Value = AF.Invoke(sum + .Bias)
-                End With
+        Try
+            For ii = 1 To Layers.Count - 1
+                For jj = 0 To Layers.Item(ii)._Count - 1
+                    With Layers.Item(ii)
+                        sum = 0
+                        For k = 0 To Layers.Item(ii - 1)._Count - 1
+                            sum = sum + Layers.Item(ii - 1)._Value(k) * ._Weights(k, jj)
+                        Next k
+                        ._Value(jj) = AF.Invoke(sum + ._Bias(jj), False)
+                    End With
+                Next
             Next
-        Next
-        Calculate = True
-        Exit Function
-ErrHandle:
-        Console.WriteLine(" Error while calculate network!! " & vbTab & Err.Description)
+            Return True
+        Catch e As Exception
+            Console.WriteLine(" Error while calculate network!! " & vbTab & Err.Description & vbCrLf & e.Message)
+            Return False
+        End Try
     End Function
 
 #Region "Default Method Trainning"
@@ -538,38 +532,38 @@ ErrHandle:
 
                 'Backward propangation
                 'Delta of output layer
-                For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
-                    With Layers(Layers.Count - 1).Neurons(ii)
-                        dActFunc = dActiveF(.ActivationFunction, .Value)
+                For ii = 0 To Layers(Layers.Count - 1)._Count - 1
+                    With Layers(Layers.Count - 1)
+                        dActFunc = ._AF.Invoke(._Value(ii), True)
                         'New * (1-p) + Old * p which New = GD of Activation * GD of Loss
-                        .Delta = dActFunc * (TargetData(m)(ii) - .Value) * (1 - Momentum) + .Delta * Momentum
+                        ._Delta(ii) = dActFunc * (TargetData(m)(ii) - ._Value(ii)) * (1 - Momentum) + ._Delta(ii) * Momentum
                     End With
                 Next ii
                 'Delta of hidden layer
                 For jj = Layers.Count - 2 To 1 Step -1
-                    For kk = 0 To Layers(jj).Neurons.Count - 1
+                    For kk = 0 To Layers(jj)._Count - 1
                         dActFunc = 0
                         SumES = 0
-                        With Layers(jj).Neurons(kk)
-                            dActFunc = dActiveF(.ActivationFunction, .Value)
+                        With Layers(jj)
+                            dActFunc = ._AF.Invoke(._Value(kk), True)
                             'New in this situation = GD of Activation * Sum of (Weight(i+1) * Delta(i+1)) of layer i + 1 
-                            For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
-                                SumES += Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).Delta
+                            For ii = 0 To Layers(Layers.Count - 1)._Count - 1
+                                SumES += Layers(jj + 1)._Weights(kk, ii) * Layers(jj + 1)._Delta(ii)
                             Next ii
-                            .Delta = dActFunc * SumES * (1 - Momentum) + .Delta * Momentum
+                            ._Delta(kk) = dActFunc * SumES * (1 - Momentum) + ._Delta(kk) * Momentum
                         End With
                     Next kk
                 Next jj
 
                 'Update
                 For ii = Layers.Count - 1 To 1 Step -1
-                    For jj = 0 To Layers(ii).Neurons.Count - 1
-                        With Layers(ii).Neurons(jj)
+                    For jj = 0 To Layers(ii)._Count - 1
+                        With Layers(ii)
                             'Update Bias
-                            .Bias += (Me.LearningRate * .Delta)
+                            ._Bias(jj) += (Me.LearningRate * ._Delta(jj))
                             'Update Weight
-                            For kk = 0 To .Weights.Count - 1
-                                .Weights(kk) += (Me.LearningRate * .Delta * Layers(ii - 1).Neurons(kk).Value)
+                            For kk = 0 To .InputSize
+                                ._Weights(kk, jj) += (LearningRate * ._Delta(jj) * Layers(ii - 1)._Value(kk))
                             Next kk
                         End With
                     Next jj
@@ -641,23 +635,23 @@ ErrHandle:
 
                     'Backward propangation
                     'Delta of output layer
-                    For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
-                        With Layers(Layers.Count - 1).Neurons(ii)
-                            dActiveFignal = dActiveF(.ActivationFunction, .Value)
-                            .AccDelta += dActiveFignal * (TargetData(miniBatch(n))(ii) - .Value) '* (1 - Momentum) + .Delta * Momentum
+                    For ii = 0 To Layers(Layers.Count - 1)._Count - 1
+                        With Layers(Layers.Count - 1)
+                            dActiveFignal = ._AF.Invoke(._Value(ii), True)
+                            ._AccDelta(ii) += dActiveFignal * (TargetData(miniBatch(n))(ii) - ._Value(ii)) '* (1 - Momentum) + .Delta * Momentum
                         End With
                     Next ii
                     'Delta of hidden layer
                     For jj = Layers.Count - 2 To 1 Step -1
-                        For kk = 0 To Layers(jj).Neurons.Count - 1
+                        For kk = 0 To Layers(jj)._Count - 1
                             dActiveFignal = 0
                             SumES = 0
-                            With Layers(jj).Neurons(kk)
-                                dActiveFignal = dActiveF(.ActivationFunction, .Value)
-                                For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
-                                    SumES += Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).AccDelta
+                            With Layers(jj)
+                                dActiveFignal = ._AF.Invoke(._Value(kk), True)
+                                For ii = 0 To Layers(Layers.Count - 1)._Count - 1
+                                    SumES += Layers(jj + 1)._Weights(ii, kk) * Layers(jj + 1)._AccDelta(ii)
                                 Next ii
-                                .AccDelta = dActiveFignal * SumES '* (1 - Momentum) + .Delta * Momentum
+                                ._AccDelta(kk) = dActiveFignal * SumES '* (1 - Momentum) + .Delta * Momentum
                             End With
                         Next kk
                     Next jj
@@ -669,15 +663,15 @@ ErrHandle:
 
                 'Update
                 For ii = Layers.Count - 1 To 1 Step -1
-                    For jj = 0 To Layers(ii).Neurons.Count - 1
-                        With Layers(ii).Neurons(jj)
+                    For jj = 0 To Layers(ii)._Count - 1
+                        With Layers(ii)
                             'Update Bias
-                            .Bias += (LearningRate * .Delta)
+                            ._Bias(jj) += (LearningRate * ._Delta(jj))
                             'Update Weight
-                            For kk = 0 To .Weights.Count - 1
-                                .Weights(kk) += (LearningRate * Layers(ii - 1).Neurons(kk).Value) * (.AccDelta * (1 - Momentum) + .Delta * Momentum)
-                                .Delta = .AccDelta
-                                .AccDelta = 0
+                            For kk = 0 To .InputSize
+                                ._Weights(kk, jj) += (LearningRate * Layers(ii - 1)._Value(kk)) * (._AccDelta(jj) * (1 - Momentum) + ._Delta(jj) * Momentum)
+                                ._Delta(jj) = ._AccDelta(jj)
+                                ._AccDelta(jj) = 0
                             Next kk
                         End With
                     Next jj
@@ -699,7 +693,7 @@ ErrHandle:
 
 #Region "Batch"
     Public Sub Train_Batch()
-        Dim dActiveFignal#, SumES#
+        Dim dAF#, SumES#
         Dim ErrAccumulated#
 
         If st_Train Then Exit Sub
@@ -721,23 +715,23 @@ ErrHandle:
 
                 'Backward propangation
                 'Delta of output layer
-                For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
-                    With Layers(Layers.Count - 1).Neurons(ii)
-                        dActiveFignal = dActiveF(.ActivationFunction, .Value)
-                        .AccDelta += dActiveFignal * (TargetData(m)(ii) - .Value) '* (1 - Momentum) + .Delta * Momentum
+                For ii = 0 To Layers(Layers.Count - 1)._Count - 1
+                    With Layers(Layers.Count - 1)
+                        dAF = ._AF.Invoke(._Value(ii), True)
+                        ._AccDelta(ii) += dAF * (TargetData(m)(ii) - ._Value(ii)) '* (1 - Momentum) + .Delta * Momentum
                     End With
                 Next ii
                 'Delta of hidden layer
                 For jj = Layers.Count - 2 To 1 Step -1
-                    For kk = 0 To Layers(jj).Neurons.Count - 1
-                        dActiveFignal = 0
+                    For kk = 0 To Layers(jj)._Count - 1
+                        dAF = 0
                         SumES = 0
-                        With Layers(jj).Neurons(kk)
-                            dActiveFignal = dActiveF(.ActivationFunction, .Value)
-                            For ii = 0 To Layers(Layers.Count - 1).Neurons.Count - 1
-                                SumES += Layers(jj + 1).Neurons(ii).Weights(kk) * Layers(jj + 1).Neurons(ii).AccDelta
+                        With Layers(jj)
+                            dAF = ._AF.Invoke(._Value(kk), True)
+                            For ii = 0 To Layers(Layers.Count - 1)._Count - 1
+                                SumES += Layers(jj + 1)._Weights(ii, kk) * Layers(jj + 1)._AccDelta(ii)
                             Next ii
-                            .AccDelta = dActiveFignal * SumES '* (1 - Momentum) + .Delta * Momentum
+                            ._AccDelta(kk) = dAF * SumES '* (1 - Momentum) + .Delta * Momentum
                         End With
                     Next kk
                 Next jj
@@ -748,15 +742,15 @@ ErrHandle:
 
             'Update
             For ii = Layers.Count - 1 To 1 Step -1
-                For jj = 0 To Layers(ii).Neurons.Count - 1
-                    With Layers(ii).Neurons(jj)
+                For jj = 0 To Layers(ii)._Count - 1
+                    With Layers(ii)
                         'Update Bias
-                        .Bias += (Me.LearningRate * .Delta)
+                        ._Bias(jj) += (Me.LearningRate * ._Delta(jj))
                         'Update Weight
-                        For kk = 0 To .Weights.Count - 1
-                            .Weights(kk) += (Me.LearningRate * Layers(ii - 1).Neurons(kk).Value) * (.AccDelta * (1 - Momentum) + .Delta * Momentum)
-                            .Delta = .AccDelta
-                            .AccDelta = 0
+                        For kk = 0 To .InputSize - 1
+                            ._Weights(kk, jj) += (Me.LearningRate * Layers(ii - 1)._Value(kk)) * (._AccDelta(jj) * (1 - Momentum) + ._Delta(jj) * Momentum)
+                            ._Delta(jj) = ._AccDelta(jj)
+                            ._AccDelta(jj) = 0
                         Next kk
                     End With
                 Next jj
@@ -780,7 +774,7 @@ End Class
 '**************************************************************************************************************************************************************
 '//Test new neural network with array (DArray Class)
 '**************************************************************************************************************************************************************
-Public Class NN_Array
+Public Class ArrayNeural
     Private Shared stored_ID%
 
     Public ID%
@@ -1015,7 +1009,7 @@ Public Class NN_Array
         Loop
     End Sub
 
-    Public Sub DefaultTrain(epoch_limit%, desired_error#, Optional ConsoleMod% = 10)
+    Public Sub Train_Default(epoch_limit%, desired_error#, Optional ConsoleMod% = 10)
         Dim Epoch%
         Dim nnError# = 1000
         Dim E As DArray
@@ -1082,7 +1076,6 @@ Public Class NN_Array
             Console.WriteLine("Error message: " & g.Message)
         End Try
     End Sub
-
 
     Public NotInheritable Class FunctionList
 
@@ -1170,6 +1163,7 @@ Public Class NN_Array
 
 End Class
 
+
 Public NotInheritable Class FunctionList
 
     ''' <summary>
@@ -1177,6 +1171,11 @@ Public NotInheritable Class FunctionList
     ''' </summary>
 
     Public NotInheritable Class Activation
+
+        Public Shared Function CallByName(strName$) As [Delegate]
+            Dim ConvertThis As [Delegate] = [Delegate].CreateDelegate(GetType(NeuralNet.ActivationFunc), Nothing, strName, False)
+            Return ConvertThis
+        End Function
 
         Public Shared Function Sigmoid(Value As Double, Optional GD As Boolean = False) As Double
             If Not GD Then
