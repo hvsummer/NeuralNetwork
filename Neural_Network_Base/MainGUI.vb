@@ -223,15 +223,19 @@ Public Class GUI
 
         End With
     End Sub
+
     Private TrainTask As Task
     Private vType, vEpoch, vSize As String
     Private vRnd As Boolean
+
     Public Sub Train_TaskHelper()
-        DNN.TrainSpecial(vType, CInt(vEpoch), listInput, listTarget, vRnd, CInt(vSize))
-        myTimer.Enabled = False
+
+        'DNN.TrainSpecial(vType, CInt(vEpoch), listInput, listTarget, vRnd, CInt(vSize))
+        Dim Train As New Training_Method.iRprop_Plus(DNN)
+        DNN.Train_Flexible(CInt(vEpoch), AddressOf Train.iRprop_plus)
+
         UpdateWP()
         Console.WriteLine(String.Format("Trained Time:{0} -- Trained Epoch:{1}", DNN.Trained_Time, DNN.Trained_Total_Epoch))
-        Console.WriteLine(String.Format("Number of loop time:{0}", DNN.test.Length))
     End Sub
 
     '****************************************************************************************************************************************
@@ -239,6 +243,7 @@ Public Class GUI
     '****************************************************************************************************************************************
     Private Sub ElapsedUpdate(sender As Object, e As Timers.ElapsedEventArgs) Handles myTimer.Elapsed
         With DNN
+            If Not .st_Train Then Exit Sub
             Console.WriteLine(String.Format("Update interval called:{0} - At time:{1} - ThreadID:{2}", .st_CurrEpoch, .ElapsedTime, Threading.Thread.CurrentThread.ManagedThreadId))
             If .Trained_Time = 0 And .st_Train = False Then Console.WriteLine("DNN not trained yet - Abort update GUI") : Exit Sub
             UpdateWP()
@@ -257,7 +262,7 @@ Public Class GUI
                 With DNN
                     If Not .ThreadSafe Then
                         Console.WriteLine("waiting Training task before Update GUI -- Train Thread is not safe yet")
-                        Threading.SpinWait.SpinUntil(Function() .ThreadSafe = True)
+                        'Threading.SpinWait.SpinUntil(Function() .ThreadSafe = True)
                         Console.WriteLine("start Update GUI -- Train Thread is safe but not sure =.=")
                     End If
                     '//update value on screen
@@ -268,14 +273,14 @@ Public Class GUI
                     tbDelta.Text = ""
                     For d = 0 To .Layers(.Layers.Count - 1)._Count - 1
                         If Len(Delta) = 0 Then
-                            Delta = Math.Round(.Layers(.Layers.Count - 1)._Delta(d), 15).ToString
+                            Delta = Math.Round(.Layers(.Layers.Count - 1)._Grad(d), 15).ToString
                         Else
-                            Delta &= "|" & Math.Round(.Layers(.Layers.Count - 1)._Delta(d), 15)
+                            Delta &= "|" & Math.Round(.Layers(.Layers.Count - 1)._Grad(d), 15)
                         End If
                         If Len(AccDelta) = 0 Then
-                            AccDelta = Math.Round(.Layers(.Layers.Count - 1)._AccDelta(d), 15).ToString
+                            AccDelta = Math.Round(.Layers(.Layers.Count - 1)._AccGrad(d), 15).ToString
                         Else
-                            AccDelta &= "|" & Math.Round(.Layers(.Layers.Count - 1)._AccDelta(d), 15)
+                            AccDelta &= "|" & Math.Round(.Layers(.Layers.Count - 1)._AccGrad(d), 15)
                         End If
                     Next d
                     tbDelta.Text = Delta & vbCrLf & AccDelta
@@ -308,7 +313,7 @@ Public Class GUI
         ' Add any initialization after the InitializeComponent() call.
         With Me
             .tbGlobalError.Text = "N/A"
-            .cbNetSetting.Text = "2=3.Leaky_RELU+4.Soft_Plus=2.Bent_Identity"
+            .cbNetSetting.Text = "2=3.LeakyRELU=4.SoftPlus=2.BentIdentity"
             .tbStatus.Text = "Status: Please add your input/target value into list using 'Add Data' button"
         End With
         DNN = New NeuralNet
@@ -348,9 +353,9 @@ Public Class GUI
         strSQL = "CREATE TABLE IF NOT EXISTS SettingList (" &
                  "ID_Setting INTEGER  PRIMARY KEY, Name_Setting TEXT, Value_Setting TEXT, dateCreated TEXT )"
         DB.Execute(strSQL)
-        If DB.Query(String.Format("SELECT Count(*) FROM SettingList WHERE Value_Setting='{0}'", "2=3.Leaky_RELU+4.Soft_Plus=2.Bent_Identity"), 2)(0) = "0" Then
+        If DB.Query(String.Format("SELECT Count(*) FROM SettingList WHERE Value_Setting='{0}'", "2=3.LeakyRELU=4.SoftPlus=2.BentIdentity"), 2)(0) = "0" Then
             DB.Execute(String.Format("INSERT INTO SettingList (Name_Setting, Value_Setting, dateCreated) VALUES ('{0}' , '{1}' , '{2}') ",
-                                     Regex.Replace("2=3.Leaky_RELU+4.Soft_Plus=2.Bent_Identity", "[a-zA-Z\._]", ""), "2=3.Leaky_RELU+4.Soft_Plus=2.Bent_Identity", Today().ToString("s")))
+                                     Regex.Replace("2=3.LeakyRELU=4.SoftPlus=2.BentIdentity", "[a-zA-Z\._]", ""), "2=3.LeakyRELU=4.SoftPlus=2.BentIdentity", Today().ToString("s")))
         End If
 
         'Table store neural network

@@ -93,6 +93,10 @@ Public Module Support
         End With
     End Function
 
+    Private Function ShowThreads() As String
+        Return String.Format("ThreadID:{0} -- ThreadState:{1}", Threading.Thread.CurrentThread.ManagedThreadId, Threading.Thread.CurrentThread.ThreadState)
+    End Function
+
     Public Function Trans1D(Inp As Object) As Object
         Dim tmpArr() As VariantType = Nothing
         Dim X%, y%
@@ -272,6 +276,7 @@ Public Module Support
             Return False
         End Try
     End Function
+
     Public Function DesktopPath() As String
         DesktopPath = Environ("USERPROFILE") & "\Desktop\"
     End Function

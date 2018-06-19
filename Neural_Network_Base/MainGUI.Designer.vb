@@ -295,7 +295,7 @@ Partial Class GUI
         Me.cbNetSetting.Name = "cbNetSetting"
         Me.cbNetSetting.Size = New System.Drawing.Size(324, 56)
         Me.cbNetSetting.TabIndex = 52
-        Me.cbNetSetting.Text = "2=3.Leaky_RELU+4.Soft_Plus=2.Bent_Identity"
+        Me.cbNetSetting.Text = "2=3.LeakyRELU=4.SoftPlus=2.BentIdentity"
         '
         'Label15
         '
