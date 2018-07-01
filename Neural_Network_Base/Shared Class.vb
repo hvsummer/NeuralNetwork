@@ -100,89 +100,93 @@ Public NotInheritable Class Training_Method
             Dim SSE# = 0, outErr# = 0
             Dim Sum# = 0
 
-            With _Net
-                _MSEPrev = _MSELast
-                _MSELast = 0
-                .Trained_Total_Epoch += 1
+            Try
 
-                'Loop through all training input of current epoch
-                For i = 0 To .InData.Count - 1
-                    '#Set Input 
-                    .SetInput(.InData(i))
+                With _Net
+                    _MSEPrev = _MSELast
+                    _MSELast = 0
+                    .Trained_Total_Epoch += 1
 
-                    '******************************************************************************************
-                    '#FeedForward 
-                    .Calculate(AF)
+                    'Loop through all training input of current epoch
+                    For i = 0 To .InData.Count - 1
 
-                    '******************************************************************************************
-                    '#BackPropangation with iRpop+ algothrim
+                        '#Set Input + #FeedForward 
+                        .Calculate(.InData(i), AF)
 
-                    'Normal Process to find Grad of each neuron from Output to Hidden Layer
-                    'Output Layer
-                    cLayer = Layers(Layers.Count - 1)
+                        '******************************************************************************************
+                        '#BackPropangation with iRpop+ algothrim
 
-                    For j = 0 To cLayer._Count - 1
-                        outErr = LF.Invoke(.TargetData(i)(j), cLayer._Value(j))
-                        cLayer._Grad(j) = cLayer._AF.Invoke(cLayer._Value(j), True) * outErr
-                        SSE += outErr ^ 2
-                    Next
+                        'Normal Process to find Grad of each neuron from Output to Hidden Layer
+                        'Output Layer
+                        cLayer = Layers(Layers.Count - 1)
 
-                    'Hidden Layer
-                    For j = Layers.Count - 2 To 1 'Loop through each layer
-                        cLayer = Layers(j)
-                        Sum = 0
-                        With cLayer
-                            For k = 0 To ._Count - 1 'Loop through each neuron/Node
-                                For l = 0 To Layers(j + 1)._Count - 1 'Loop through each neuron/Node of Right-Layer (index +1)
-                                    Sum += Layers(j + 1)._Weights(k, l) * Layers(j + 1)._Grad(l)
+                        For j = 0 To cLayer._Count - 1
+                            outErr = LF.Invoke(.TargetData(i)(j), cLayer._Value(j))
+                            cLayer._Grad(j) = cLayer._AF.Invoke(cLayer._Value(j), True) * outErr
+                            SSE += outErr ^ 2
+                        Next
+
+                        'Hidden Layer
+                        For j = Layers.Count - 2 To 1 'Loop through each layer
+                            cLayer = Layers(j)
+                            Sum = 0
+                            With cLayer
+                                For k = 0 To ._Count - 1 'Loop through each neuron/Node
+                                    For l = 0 To Layers(j + 1)._Count - 1 'Loop through each neuron/Node of Right-Layer (index +1)
+                                        Sum += Layers(j + 1)._Weights(k, l) * Layers(j + 1)._Grad(l)
+                                    Next
+                                    ._Grad(k) = ._AF.Invoke(._Value(k), True) * Sum
                                 Next
-                                ._Grad(k) = ._AF.Invoke(._Value(k), True) * Sum
-                            Next
-                        End With
+                            End With
+                        Next
+
+                        'iRprop+ implement here:
+                        'Update Acc Grad Input
+                        For j = Layers.Count - 1 To 1 Step -1
+
+                            'We don't need to fill innitial weight Grads Accumulation = 0 
+                            'due to New iLayer redim this array into default value of varriable data type
+                            'Layers(j)._wGradsAcc.Fill(0)
+
+                            cLayer = Layers(j)
+                            With cLayer
+                                For k = 0 To ._Count - 1
+                                    'Update Weight
+                                    For l = 0 To .InputSize - 1
+                                        ._wGradsAcc(l, k) += ._Grad(k) * Layers(j - 1)._Value(l)
+                                    Next l
+
+                                    'Update Bias
+                                    ._bGradsAcc(k) += ._Grad(k) * ._Bias(k)
+
+                                Next k
+
+                                'Copy data Grad to PrevGrad
+                                'double type 64 bits (8 bytes)
+                                Buffer.BlockCopy(._wGradsAcc, 0, ._wPrevGradsAcc, 0, ._wGradsAcc.Length * 8)
+
+                            End With
+
+                        Next j
                     Next
 
-                    'iRprop+ implement here:
-                    'Update Acc Grad Input
-                    For j = Layers.Count - 1 To 1 Step -1
-
-                        'We don't need to fill innitial weight Grads Accumulation = 0 
-                        'due to New iLayer redim this array into default value of varriable data type
-                        'Layers(j)._wGradsAcc.Fill(0)
-
-                        cLayer = Layers(j)
-                        With cLayer
-                            For k = 0 To ._Count - 1
-                                'Update Weight
-                                For l = 0 To .InputSize - 1
-                                    ._wGradsAcc(l, k) += ._Grad(k) * Layers(j - 1)._Value(l)
-                                Next l
-
-                                'Update Bias
-                                ._bGradsAcc(k) += ._Grad(k) * ._Bias(k)
-
-                            Next k
-
-                            'Copy data Grad to PrevGrad
-                            ._wGradsAcc.CopyTo(._wPrevGradsAcc, 0)
-
-                        End With
-
-                    Next j
-                Next
-
-                Parallel.For(0, Layers.Count - 1, Sub(x)
-                                                      iRprop_Plus_wUpdate(x)
-                                                      iRprop_Plus_bUpdate(x)
-                                                  End Sub)
+                    Parallel.For(0, Layers.Count - 1, Sub(x)
+                                                          iRprop_Plus_wUpdate(x)
+                                                          iRprop_Plus_bUpdate(x)
+                                                      End Sub)
 
 
-                'Return weight + bias to Layer form iLayer
-                For i = 0 To Layers.Count - 1
-                    Layers(i).ReturnWeights(_Net.Layers(i))
-                Next
+                    'Return weight + bias to Layer form iLayer
+                    For i = 0 To Layers.Count - 1
+                        Layers(i).ReturnWeights(_Net.Layers(i))
+                    Next
 
-                _MSELast /= _Net.InData.Count * _Net.OutputSize
-            End With
+                    _MSELast = SSE / _Net.InData.Count * _Net.OutputSize
+                End With
+            Catch e As Exception
+                MsgBox(e.Message)
+            End Try
+
         End Sub
 
         Private Sub iRprop_Plus_wUpdate(x%)

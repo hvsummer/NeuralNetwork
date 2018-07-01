@@ -192,8 +192,7 @@ Public Class NeuralNet
         Get
             Dim s As New Text.StringBuilder
             For jj = 0 To InData.Count - 1
-                SetInput(InData(jj))
-                Calculate()
+                Calculate(InData(jj))
                 'Update string Result array
                 s.Append(Me.Current_Result).Append(Deli)
             Next
@@ -210,8 +209,7 @@ Public Class NeuralNet
             Dim s As New Text.StringBuilder
             Dim TempErr# = 0#
             For jj = 0 To InData.Count - 1
-                SetInput(InData(jj))
-                Calculate()
+                Calculate(InData(jj))
                 s.Append(method_MSE()).Append(Deli)
             Next
             'SetInput(InData(CurrentIndex))
@@ -332,22 +330,6 @@ Public Class NeuralNet
 
 #Region "Method to Set Input/Target Network"
     '//input with setinput, output with result
-    Public Function SetInput(InArray As List(Of Double)) As Boolean
-
-        If InArray.Count > InputSize Then
-            MsgBox("Input array's Size: " & InArray.Count & " does not match with current input size: " & InputSize)
-            Return False
-            Exit Function
-        End If
-
-        For ii = 0 To Layers(0)._Count - 1
-            Layers(0)._Value(ii) = InArray(ii)
-        Next
-
-        st_Input = InArray.ToStr("|")
-        Return True
-    End Function
-
     Public Sub PrepareInOut(setInputList As List(Of Double), setTargetList As List(Of Double))
         Dim NoInput% = InputSize
         Dim NoTarget% = OutputSize
@@ -364,10 +346,42 @@ Public Class NeuralNet
             TargetData.Add(setTargetList.GetRange(ii, NoTarget))
         Next
     End Sub
+
 #End Region
 
     '//Execute input with calculate
-    Public Overloads Function Calculate() As Boolean
+    Public Function Calculate(InArray As List(Of Double)) As Boolean
+
+        If InArray.Count > InputSize Then
+            MsgBox("Input array's Size: " & InArray.Count & " does not match with current input size: " & InputSize)
+            Return False
+            Exit Function
+        End If
+
+        For ii = 0 To Layers(0)._Count - 1
+            Layers(0)._Value(ii) = InArray(ii)
+        Next
+
+        st_Input = InArray.ToStr("|")
+        Return Calculate()
+    End Function
+    Public Function Calculate(InArray As List(Of Double), AF As FunctionList.Delegate_NeuralNet.ActivationFunc) As Boolean
+
+        If InArray.Count > InputSize Then
+            MsgBox("Input array's Size: " & InArray.Count & " does not match with current input size: " & InputSize)
+            Return False
+            Exit Function
+        End If
+
+        For ii = 0 To Layers(0)._Count - 1
+            Layers(0)._Value(ii) = InArray(ii)
+        Next
+
+        st_Input = InArray.ToStr("|")
+        Return Calculate(AF)
+    End Function
+
+    Public Function Calculate() As Boolean
         Dim sum#
         Try
             For ii = 1 To Layers.Count - 1
@@ -387,7 +401,7 @@ Public Class NeuralNet
             Return False
         End Try
     End Function
-    Public Overloads Function Calculate(AF As FunctionList.Delegate_NeuralNet.ActivationFunc) As Boolean
+    Public Function Calculate(AF As FunctionList.Delegate_NeuralNet.ActivationFunc) As Boolean
         Dim sum#
         Try
             For ii = 1 To Layers.Count - 1
@@ -502,9 +516,8 @@ Public Class NeuralNet
                 '//Feedforward
                 '//TODO = Random deative neuron 
 
-                If SetInput(InData(m)) = False Then Exit Sub
+                If Calculate(InData(m)) = False Then Exit Sub
                 CurrentIndex = m
-                Calculate()
                 Me.st_FF += 1
 
                 'Backward propangation
@@ -614,9 +627,8 @@ Public Class NeuralNet
 
                 '//Feedforward
                 For n = 0 To miniBatch.Count - 1
-                    If SetInput(InData(miniBatch(n))) = False Then Exit Sub
+                    If Calculate(InData(miniBatch(n))) = False Then Exit Sub
                     CurrentIndex = miniBatch(n)
-                    Calculate()
                     Me.st_FF += 1
 
                     'Backward propangation
@@ -694,9 +706,8 @@ Public Class NeuralNet
 
                 'random have no effect in batch trainning =.= random pos ?? no affect
                 '//Feedforward
-                If SetInput(InData(m)) = False Then Exit Sub
+                If Calculate(InData(m)) = False Then Exit Sub
                 CurrentIndex = m
-                Calculate()
                 Me.st_FF += 1
 
                 'Backward propangation

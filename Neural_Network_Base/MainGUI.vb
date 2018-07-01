@@ -25,8 +25,7 @@ Public Class GUI
         tbDebugOutput.Text = ""
 
         With DNN
-            .SetInput(C2List(tbDebugInput.Text).ConvertAll(New Converter(Of Object, Double)(Function(x) CDbl(x))))
-            .Calculate()
+            .Calculate(C2List(tbDebugInput.Text).ConvertAll(New Converter(Of Object, Double)(Function(x) CDbl(x))))
 
             'Update string Result array
             tbDebugOutput.Text = .Current_Result
@@ -43,6 +42,8 @@ Public Class GUI
         listArr1 = C2List(tbInput.Text).ConvertAll(New Converter(Of String, Double)(Function(x) CDbl(x)))
         listArr2 = C2List(tbTarget.Text).ConvertAll(New Converter(Of String, Double)(Function(x) CDbl(x)))
 
+
+        'TODO: Finish execute routine
         With DNN
             .PrepareInOut(listArr1, listArr2)
             'Update string Result array
@@ -148,6 +149,7 @@ Public Class GUI
             MsgBox("Already in the list")
         End If
     End Sub
+
     Private Sub Update_cbNetSetting()
         With cbNetSetting
             .Items.Clear()
@@ -231,7 +233,9 @@ Public Class GUI
     Public Sub Train_TaskHelper()
 
         'DNN.TrainSpecial(vType, CInt(vEpoch), listInput, listTarget, vRnd, CInt(vSize))
+
         Dim Train As New Training_Method.iRprop_Plus(DNN)
+        DNN.PrepareInOut(listInput, listTarget)
         DNN.Train_Flexible(CInt(vEpoch), AddressOf Train.iRprop_plus)
 
         UpdateWP()
@@ -239,7 +243,7 @@ Public Class GUI
     End Sub
 
     '****************************************************************************************************************************************
-    '//Update Winform Code per 1000ms
+    '//Update Winform status per 1000ms
     '****************************************************************************************************************************************
     Private Sub ElapsedUpdate(sender As Object, e As Timers.ElapsedEventArgs) Handles myTimer.Elapsed
         With DNN

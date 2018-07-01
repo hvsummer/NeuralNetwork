@@ -71,12 +71,13 @@ End Class
 Module Layer_Support
     <Extension()>
     Public Function Fill(ByRef S As Double(), Value As Double) As Double()
-        Return S.Zip(Enumerable.Range(0, S.GetUpperBound(0)), Function() Value).ToArray
+        S = Enumerable.Repeat(Value, S.GetUpperBound(0) + 1).ToArray
+        Return S
     End Function
     <Extension()>
     Public Function Fill(ByRef S As Double(,), Value As Double) As Double(,)
         For x = S.GetLowerBound(0) To S.GetUpperBound(0)
-            For y = S.GetUpperBound(1) To S.GetUpperBound(1)
+            For y = S.GetLowerBound(1) To S.GetUpperBound(1)
                 S(x, y) = Value
             Next
         Next
